@@ -1,5 +1,67 @@
 # AI Job Bot
 
+An automated job application system that scrapes jobs, filters them using AI, and generates tailored resumes.
+
+## Getting Started
+
+### Prerequisites
+
+- Python 3.10 or higher
+- pip (Python package installer)
+
+### Installation
+
+1. Clone this repository
+2. Install the required dependencies:
+
+```bash
+pip install -r requirements.txt
+```
+
+### Usage
+
+#### LinkedIn Job Scraper
+
+The `scrape_jobs.py` script scrapes job postings from LinkedIn using the [JobSpy library](https://github.com/speedyapply/JobSpy).
+
+**Run the scraper:**
+
+```bash
+python scrape_jobs.py
+```
+
+**Configuration:**
+
+The script is configured with the following default parameters:
+- **Search Term:** "software engineer"
+- **Location:** "San Francisco, CA"
+- **Number of Results:** 50 jobs
+- **Output File:** `jobs.csv`
+
+To customize these parameters, edit the variables in `scrape_jobs.py`:
+
+```python
+search_term = "your job title"
+location = "your location"
+results_wanted = 50
+```
+
+**Output:**
+
+The script will create a `jobs.csv` file containing:
+- Job title
+- Company name
+- Location
+- Job type (full-time, part-time, etc.)
+- Salary information (if available)
+- Job description
+- Job URL
+- And more...
+
+**Important Notes:**
+- LinkedIn may rate-limit requests after multiple scrapes. If you encounter issues, consider using proxies or waiting between scrapes.
+- The script uses `linkedin_fetch_description=True` to get full job details, which increases the number of requests.
+
 ## Architecture
 
 ```mermaid
