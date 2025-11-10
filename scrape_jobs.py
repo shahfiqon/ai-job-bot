@@ -2,6 +2,9 @@
 """
 LinkedIn Job Scraper using JobSpy Library
 Scrapes job postings from LinkedIn and saves them to a CSV file.
+
+
+https://github.com/nubelaco/enrich-linkedin-companies-in-bulk
 """
 
 import csv
@@ -17,7 +20,7 @@ def main():
     # Hardcoded search parameters
     search_term = "software engineer"
     location = "San Francisco, CA"
-    results_wanted = 50
+    results_wanted = 5
     
     print(f"Search Term: {search_term}")
     print(f"Location: {location}")

@@ -1,4 +1,5 @@
 from bs4 import BeautifulSoup
+from urllib.parse import urlparse, urlunparse
 
 from jobspy.model import JobType, Location
 from jobspy.util import get_enum_from_job_type
@@ -83,6 +84,116 @@ def parse_company_industry(soup_industry: BeautifulSoup) -> str | None:
             industry = industry_span.get_text(strip=True)
 
     return industry
+
+
+def parse_company_headquarters(soup_headquarters: BeautifulSoup) -> str | None:
+    """
+    Gets the company headquarters from job page
+    :param soup_headquarters:
+    :return: str
+    """
+    h3_tag = soup_headquarters.find(
+        "h3",
+        class_="description__job-criteria-subheader",
+        string=lambda text: "Headquarters" in text,
+    )
+    headquarters = None
+    if h3_tag:
+        headquarters_span = h3_tag.find_next_sibling(
+            "span",
+            class_="description__job-criteria-text description__job-criteria-text--criteria",
+        )
+        if headquarters_span:
+            headquarters = headquarters_span.get_text(strip=True)
+
+    return headquarters
+
+
+def parse_company_employees_count(soup_employees_count: BeautifulSoup) -> str | None:
+    """
+    Gets the company employees count from job page
+    :param soup_employees_count:
+    :return: str
+    """
+    h3_tag = soup_employees_count.find(
+        "h3",
+        class_="description__job-criteria-subheader",
+        string=lambda text: "Company size" in text,
+    )
+    employees_count = None
+    if h3_tag:
+        employees_count_span = h3_tag.find_next_sibling(
+            "span",
+            class_="description__job-criteria-text description__job-criteria-text--criteria",
+        )
+        if employees_count_span:
+            employees_count = employees_count_span.get_text(strip=True)
+
+    return employees_count
+
+
+def parse_job_poster(soup: BeautifulSoup) -> tuple[str | None, str | None]:
+    """
+    Gets the job poster name and profile URL from the hiring team section
+    :param soup: BeautifulSoup object of the job page
+    :return: tuple of (name, profile_url) where each is str | None
+    """
+    try:
+        # Search for heading containing "hiring team" (case-insensitive)
+        heading = soup.find(
+            ["h2", "h3"],
+            string=lambda text: text and "hiring team" in text.lower()
+        )
+
+        if not heading:
+            return (None, None)
+
+        # Find the nearest section container
+        section_container = heading.find_parent(["section", "div", "ul"])
+        if not section_container:
+            return (None, None)
+
+        # Find the first profile anchor whose href contains /in/
+        profile_anchor = section_container.find(
+            "a",
+            href=lambda href: href and "/in/" in href
+        )
+
+        if not profile_anchor:
+            return (None, None)
+
+        # Extract the display name from the anchor text or a sibling element
+        name = profile_anchor.get_text(strip=True)
+        if not name:
+            # Try to find name in sibling elements
+            name_element = profile_anchor.find_next_sibling()
+            if name_element:
+                name = name_element.get_text(strip=True)
+
+        # Get the href and normalize the URL
+        href = profile_anchor.get("href", "")
+        if not href:
+            return (name or None, None)
+
+        # Parse URL and remove query parameters
+        parsed = urlparse(href)
+        clean_url = urlunparse((
+            parsed.scheme,
+            parsed.netloc,
+            parsed.path,
+            "",  # params
+            "",  # query
+            ""   # fragment
+        ))
+
+        # Make absolute URL if relative
+        if not clean_url.startswith("http"):
+            clean_url = f"https://www.linkedin.com{clean_url if clean_url.startswith('/') else '/' + clean_url}"
+
+        return (name or None, clean_url)
+
+    except Exception:
+        return (None, None)
 
 
 def is_job_remote(title: dict, description: str, location: Location) -> bool:

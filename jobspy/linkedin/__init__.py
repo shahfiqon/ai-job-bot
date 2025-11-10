@@ -18,7 +18,10 @@ from jobspy.linkedin.util import (
     job_type_code,
     parse_job_type,
     parse_job_level,
-    parse_company_industry
+    parse_company_industry,
+    parse_company_headquarters,
+    parse_company_employees_count,
+    parse_job_poster,
 )
 from jobspy.model import (
     JobPost,
@@ -240,6 +243,10 @@ class LinkedIn(Scraper):
             emails=extract_emails_from_text(description),
             company_logo=job_details.get("company_logo"),
             job_function=job_details.get("job_function"),
+            company_headquarters=job_details.get("company_headquarters"),
+            company_employees_count=job_details.get("company_employees_count"),
+            job_poster_name=job_details.get("job_poster_name"),
+            job_poster_profile_url=job_details.get("job_poster_profile_url"),
         )
 
     def _get_job_details(self, job_id: str) -> dict:
@@ -287,6 +294,9 @@ class LinkedIn(Scraper):
             if (logo_image := soup.find("img", {"class": "artdeco-entity-image"}))
             else None
         )
+        company_headquarters = parse_company_headquarters(soup)
+        company_employees_count = parse_company_employees_count(soup)
+        job_poster_name, job_poster_profile_url = parse_job_poster(soup)
         return {
             "description": description,
             "job_level": parse_job_level(soup),
@@ -295,6 +305,10 @@ class LinkedIn(Scraper):
             "job_url_direct": self._parse_job_url_direct(soup),
             "company_logo": company_logo,
             "job_function": job_function,
+            "company_headquarters": company_headquarters,
+            "company_employees_count": company_employees_count,
+            "job_poster_name": job_poster_name,
+            "job_poster_profile_url": job_poster_profile_url,
         }
 
     def _get_location(self, metadata_card: Optional[Tag]) -> Location:
