@@ -1,9 +1,24 @@
-# AI Job Bot
+# Job Apply Assistant Bot
 
-An automated job application system that scrapes jobs, filters them using AI, and generates tailored resumes.
+An automated job application system that scrapes jobs, enriches them with external data, and generates tailored application materials.
 
+## Monorepo Layout
+- `jobspy/` – core scraping library originally shipped with this repository
+- `backend/` – new FastAPI service that orchestrates scraping, enrichment, and workflow automation
+- `backend/cli/` – Typer + Rich command-line tools for scraping jobs and enriching company data
+- `frontend/` – planned Next.js dashboard (coming soon)
+- `notebooks/` – Jupyter explorations such as Proxycurl integration prototypes
+- `scrape_jobs.py` – legacy helper script that exercises the jobspy library
+
+## Quick Start
+- Backend API: see `backend/README.md` for PDM setup, `.env` configuration, and local server instructions
+- CLI scraping: `cd backend && pdm run jobbot scrape --search-term "software engineer" --location "San Francisco" --results-wanted 10`
+- Frontend: placeholder until the Next.js app lands in later phases
+- JobSpy tooling: continue using `requirements.txt` or Poetry config from the repo root
 
 ## Architecture
+
+This system consists of three cooperating layers: job scraping (JobSpy), backend APIs (FastAPI + PostgreSQL), and a forthcoming frontend for human review. Data flows from external job boards into our database, enriched with Proxycurl where needed, before reaching the UI.
 
 ```mermaid
 %%{init: {
@@ -67,29 +82,7 @@ flowchart LR
   classDef input fill:#FAF5FF,stroke:#A78BFA,stroke-width:1px,color:#3730A3;
 ```
 
-## Resources 
-
-- [JSON Resume](https://docs.jsonresume.org/)
-
-## Getting Started
-
-### Prerequisites
-
-- Python 3.10 or higher
-- pip (Python package installer)
-
-### Installation
-
-1. Clone this repository
-2. Install the required dependencies:
-
-```bash
-pip install -r requirements.txt
-```
-
-### Usage
-
-#### LinkedIn Job Scraper
+## JobSpy Library & Legacy Script
 
 The `scrape_jobs.py` script scrapes job postings from LinkedIn using the [JobSpy library](https://github.com/speedyapply/JobSpy).
 
@@ -101,13 +94,13 @@ python scrape_jobs.py
 
 **Configuration:**
 
-The script is configured with the following default parameters:
+The script ships with these defaults:
 - **Search Term:** "software engineer"
 - **Location:** "San Francisco, CA"
 - **Number of Results:** 50 jobs
 - **Output File:** `jobs.csv`
 
-To customize these parameters, edit the variables in `scrape_jobs.py`:
+Update the variables in `scrape_jobs.py` to customize:
 
 ```python
 search_term = "your job title"
@@ -117,17 +110,23 @@ results_wanted = 50
 
 **Output:**
 
-The script will create a `jobs.csv` file containing:
-- Job title
-- Company name
-- Location
-- Job type (full-time, part-time, etc.)
-- Salary information (if available)
-- Job description
-- Job URL
-- And more...
+`jobs.csv` will contain job metadata such as titles, employers, locations, salary hints, descriptions, and URLs.
 
 **Important Notes:**
-- LinkedIn may rate-limit requests after multiple scrapes. If you encounter issues, consider using proxies or waiting between scrapes.
-- The script uses `linkedin_fetch_description=True` to get full job details, which increases the number of requests.
+- LinkedIn can rate-limit repeated scrapes. Add delays or proxies as needed.
+- The script sets `linkedin_fetch_description=True`, increasing the number of LinkedIn requests.
 
+## Resources
+
+- [JSON Resume](https://docs.jsonresume.org/)
+
+## Backend
+
+### CLI Tools
+The backend ships with a Typer-powered CLI (`pdm run jobbot`) that scrapes LinkedIn via JobSpy, enriches companies using Proxycurl, and writes everything to PostgreSQL with Rich-powered progress bars. See [backend/README.md](backend/README.md#cli-tools) for full usage instructions.
+
+Key features:
+- Scrapes jobs using the `python-jobspy` library
+- Enriches LinkedIn companies through the Proxycurl API
+- Deduplicates companies by LinkedIn URL and jobs by `job_url`
+- Presents colorful status updates, progress bars, and a summary table in the terminal
