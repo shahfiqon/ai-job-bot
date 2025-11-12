@@ -7,9 +7,26 @@ class Settings(BaseSettings):
         default="postgresql://postgres:postgres@localhost:5432/jobbot",
         description="PostgreSQL connection string",
     )
-    PROXYCURL_API_KEY: str = Field(
+    PROXYCURL_API_KEY: str | None = Field(
+        default=None,
         description="Proxycurl API key for company enrichment (required for CLI scrape command)",
     )
+    CORS_ORIGINS: list[str] = Field(
+        default_factory=lambda: [
+            "http://localhost:3000",
+            "http://127.0.0.1:3000",
+        ],
+        description="Comma-separated list of allowed origins for CORS",
+    )
+
+    @field_validator("CORS_ORIGINS", mode="before")
+    @classmethod
+    def parse_cors_origins(cls, value: str | list[str] | None) -> list[str]:
+        if value is None:
+            return []
+        if isinstance(value, str):
+            return [origin.strip() for origin in value.split(",") if origin.strip()]
+        return value
 
     model_config = SettingsConfigDict(
         env_file=".env",
@@ -17,16 +34,6 @@ class Settings(BaseSettings):
         case_sensitive=False,
         extra="ignore",
     )
-
-    @field_validator("PROXYCURL_API_KEY")
-    @classmethod
-    def validate_proxycurl_key(cls, value: str) -> str:
-        if not value or not value.strip():
-            raise ValueError(
-                "PROXYCURL_API_KEY is required. Grab one from https://nubela.co/proxycurl"
-            )
-        return value
-
 
 def get_settings() -> Settings:
     return Settings()

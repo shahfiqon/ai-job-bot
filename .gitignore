@@ -221,3 +221,13 @@ backend/alembic/versions/*.pyc
 *.pyc
 *.pyo
 *.pyd
+
+# Frontend (Next.js)
+frontend/node_modules/
+frontend/.next/
+frontend/out/
+frontend/.env*.local
+frontend/.env
+frontend/.vercel
+frontend/*.tsbuildinfo
+frontend/next-env.d.ts

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+import time
 from datetime import date
 from typing import Any, Iterable
 from urllib.parse import urlparse, urlunparse
@@ -17,43 +18,75 @@ logger = logging.getLogger(__name__)
 PROXYCURL_COMPANY_ENDPOINT = "https://enrichlayer.com/api/v2/company"
 
 
-def fetch_company_from_proxycurl(linkedin_url: str) -> dict[str, Any] | None:
+def fetch_company_from_proxycurl(
+    linkedin_url: str,
+    *,
+    max_attempts: int = 3,
+) -> dict[str, Any] | None:
     if not linkedin_url:
         return None
 
-    headers = {"Authorization": f"Bearer {settings.PROXYCURL_API_KEY}"}
+    api_key = settings.PROXYCURL_API_KEY
+    if not api_key:
+        logger.error("Proxycurl API key is missing; cannot enrich %s", linkedin_url)
+        return None
+
+    headers = {"Authorization": f"Bearer {api_key}"}
     params = {"url": linkedin_url}
 
-    try:
-        response = requests.get(
-            PROXYCURL_COMPANY_ENDPOINT,
-            headers=headers,
-            params=params,
-            timeout=30,
-        )
-        response.raise_for_status()
-        return response.json()
-    except requests.HTTPError as exc:
-        status_code = exc.response.status_code if exc.response else "HTTP"
-        if status_code == 401:
-            logger.error("Proxycurl API key rejected for %s", linkedin_url)
-        elif status_code == 429:
-            logger.error(
-                "Proxycurl rate limit exceeded while enriching %s", linkedin_url
+    backoff_delay = 1.0
+    attempt = 0
+
+    while attempt < max_attempts:
+        attempt += 1
+        try:
+            response = requests.get(
+                PROXYCURL_COMPANY_ENDPOINT,
+                headers=headers,
+                params=params,
+                timeout=30,
             )
-        elif status_code == 404:
-            logger.warning("Proxycurl could not find company for %s", linkedin_url)
-        else:
+            response.raise_for_status()
+            return response.json()
+        except requests.HTTPError as exc:
+            status_code = exc.response.status_code if exc.response else "HTTP"
+            if status_code == 401:
+                logger.error("Proxycurl API key rejected for %s", linkedin_url)
+                return None
+            if status_code == 429:
+                if attempt < max_attempts:
+                    logger.warning(
+                        "Proxycurl rate limit hit for %s; retrying in %ss "
+                        "(attempt %s/%s)",
+                        linkedin_url,
+                        int(backoff_delay),
+                        attempt,
+                        max_attempts,
+                    )
+                    time.sleep(backoff_delay)
+                    backoff_delay *= 2
+                    continue
+                logger.error(
+                    "Proxycurl rate limit exceeded for %s after %s attempts",
+                    linkedin_url,
+                    attempt,
+                )
+                return None
+            if status_code == 404:
+                logger.warning("Proxycurl could not find company for %s", linkedin_url)
+                return None
             logger.error(
                 "Proxycurl HTTP error (%s) while enriching %s: %s",
                 status_code,
                 linkedin_url,
                 exc,
             )
-        return None
-    except requests.RequestException as exc:
-        logger.error("Proxycurl request failure for %s: %s", linkedin_url, exc)
-        return None
+            return None
+        except requests.RequestException as exc:
+            logger.error("Proxycurl request failure for %s: %s", linkedin_url, exc)
+            return None
+
+    return None
 
 
 def map_proxycurl_to_company(

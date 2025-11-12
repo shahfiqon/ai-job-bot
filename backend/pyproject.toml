@@ -16,6 +16,8 @@ dependencies = [
     "python-jobspy>=1.1.79",
     "pydantic-settings",
     "python-dotenv",
+    "pandas",
+    "ipykernel>=7.1.0",
 ]
 
 [project.scripts]

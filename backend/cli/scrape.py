@@ -16,6 +16,7 @@ from rich.progress import (
 from rich.table import Table
 from sqlalchemy.exc import SQLAlchemyError
 
+from app.config import settings
 from app.db import SessionLocal
 from app.models.company import Company
 from app.models.job import Job
@@ -89,8 +90,9 @@ def scrape(
                     location=location,
                     results_wanted=results_wanted,
                     linkedin_fetch_description=True,
-                    hours_old=None,
                     country_indeed="USA",
+                    is_remote=True,
+                    hours_old=3,
                 )
             except Exception as exc:  # noqa: BLE001
                 logger.exception("Job scraping failed")
@@ -119,6 +121,13 @@ def scrape(
             console.print(
                 f"[bold cyan]Found {len(linkedin_urls)} LinkedIn company URLs.[/]"
             )
+
+            if not settings.PROXYCURL_API_KEY:
+                console.print(
+                    "[bold red]Proxycurl API key missing.[/] "
+                    "Set PROXYCURL_API_KEY in your environment or .env file to enable company enrichment."
+                )
+                raise typer.Exit(code=1)
 
             company_cache: dict[str, int] = {}
             company_stats = {
@@ -186,16 +195,17 @@ def scrape(
 
 def _extract_unique_linkedin_urls(df: pd.DataFrame) -> list[str]:
     linkedin_urls: set[str] = set()
-    if "company_url" not in df.columns:
+    source_columns = [
+        column for column in ("company_url", "company_url_direct") if column in df.columns
+    ]
+    if not source_columns:
         return []
 
-    mask = df["company_url"].astype(str).str.contains(
-        "linkedin.com/company", case=False, na=False
-    )
-    for raw_url in df.loc[mask, "company_url"].dropna():
-        normalized = normalize_linkedin_url(str(raw_url))
-        if normalized:
-            linkedin_urls.add(normalized)
+    for column in source_columns:
+        for raw_url in df[column].dropna().astype(str):
+            normalized = normalize_linkedin_url(raw_url)
+            if normalized:
+                linkedin_urls.add(normalized)
     return sorted(linkedin_urls)
 
 

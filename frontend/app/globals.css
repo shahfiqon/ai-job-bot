@@ -1,0 +1,96 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: 0 0% 100%;
+    --foreground: 222.2 84% 4.9%;
+    --card: 0 0% 100%;
+    --card-foreground: 222.2 84% 4.9%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 222.2 84% 4.9%;
+    --primary: 221.2 83.2% 53.3%;
+    --primary-foreground: 210 40% 98%;
+    --secondary: 210 40% 96.1%;
+    --secondary-foreground: 222.2 47.4% 11.2%;
+    --muted: 210 40% 96.1%;
+    --muted-foreground: 215.4 16.3% 46.9%;
+    --accent: 210 40% 96.1%;
+    --accent-foreground: 222.2 47.4% 11.2%;
+    --destructive: 0 84.2% 60.2%;
+    --destructive-foreground: 210 40% 98%;
+    --border: 214.3 31.8% 91.4%;
+    --input: 214.3 31.8% 91.4%;
+    --ring: 221.2 83.2% 53.3%;
+    --radius: 0.5rem;
+  }
+
+  * {
+    @apply border-border;
+  }
+
+  html {
+    scroll-behavior: smooth;
+  }
+
+  body {
+    @apply bg-background text-foreground;
+  }
+
+  /* Custom prose styles for job descriptions */
+  .prose-job-description {
+    @apply text-base leading-7 text-foreground;
+  }
+
+  .prose-job-description h1,
+  .prose-job-description h2,
+  .prose-job-description h3 {
+    @apply font-semibold text-foreground mt-6 mb-3;
+  }
+
+  .prose-job-description h1 {
+    @apply text-2xl;
+  }
+
+  .prose-job-description h2 {
+    @apply text-xl;
+  }
+
+  .prose-job-description h3 {
+    @apply text-lg;
+  }
+
+  .prose-job-description p {
+    @apply mb-4;
+  }
+
+  .prose-job-description ul,
+  .prose-job-description ol {
+    @apply mb-4 ml-6;
+  }
+
+  .prose-job-description ul {
+    @apply list-disc;
+  }
+
+  .prose-job-description ol {
+    @apply list-decimal;
+  }
+
+  .prose-job-description li {
+    @apply mb-2;
+  }
+
+  .prose-job-description strong {
+    @apply font-semibold text-foreground;
+  }
+
+  .prose-job-description a {
+    @apply text-primary underline hover:text-primary/80 transition-colors;
+  }
+
+  .prose-job-description code {
+    @apply bg-muted px-1.5 py-0.5 rounded text-sm font-mono;
+  }
+}

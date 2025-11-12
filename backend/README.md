@@ -108,6 +108,58 @@ The backend includes a Typer-powered CLI for scraping jobs, enriching company pr
 - Company enrichment data is cached in PostgreSQL, so repeat scrapes skip API calls
 - Rich-powered output requires a terminal that supports ANSI colors
 
+## API Endpoints
+
+The FastAPI service exposes REST endpoints consumed by the Next.js frontend.
+
+- **Base URL:** `http://localhost:8000`
+- **Interactive Docs:** `http://localhost:8000/docs`
+
+### `GET /api/jobs`
+- Lists jobs ordered by most recent posting.
+- **Query parameters**
+  - `page` (int, default `1`, min `1`)
+  - `page_size` (int, default `20`, min `1`, max `100`)
+- **Response:** `JobListResponse`
+  - `jobs`: array of job objects
+  - `total`: total number of jobs
+  - `page`: current page number
+  - `page_size`: items per page
+  - `total_pages`: total page count
+- **Example:** `GET /api/jobs?page=1&page_size=20`
+
+### `GET /api/jobs/{job_id}`
+- Returns a single job with optional company details.
+- **Path parameter**
+  - `job_id` (int): primary key of the job.
+- **Response:** `JobDetailResponse`
+  - All job fields
+  - `company`: `CompanyResponse | null`
+- **Errors**
+  - `404` if the job is missing.
+  - `500` for unexpected server/database issues.
+- **Example:** `GET /api/jobs/1`
+
+### CORS
+- Configure allowed origins via the `CORS_ORIGINS` environment variable (comma-separated). Defaults cover both `http://localhost:3000` and `http://127.0.0.1:3000` for local development.
+- Allowed methods/headers: `*`
+- Credentials: enabled
+
+### Data Format
+- JSON responses using ISO 8601 timestamps (e.g., `2025-01-15T10:30:00Z`)
+- JSONB fields (`job_type`, `emails`, `specialities`) are serialized as arrays
+
+### Testing the API
+1. Start the backend: `pdm run uvicorn app.main:app --reload`
+2. Visit `http://localhost:8000/docs` to exercise the endpoints.
+3. Or use `curl`:
+   ```bash
+   curl "http://localhost:8000/api/jobs?page=1&page_size=10"
+   curl "http://localhost:8000/api/jobs/1"
+   ```
+
+> **Note:** The API expects PostgreSQL to be running with seeded job data. If the database is empty the list endpoint will simply return an empty array.
+
 ## Database Models
 New SQLAlchemy ORM models live in `app/models/`:
 

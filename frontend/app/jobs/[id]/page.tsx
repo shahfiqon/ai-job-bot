@@ -1,0 +1,481 @@
+import type { Metadata } from "next"
+import Link from "next/link"
+import { notFound } from "next/navigation"
+import {
+  ArrowLeft,
+  MapPin,
+  Briefcase,
+  DollarSign,
+  Calendar,
+  Building2,
+  Users,
+  Globe,
+  ExternalLink,
+} from "lucide-react"
+
+import PageLayout from "@/components/page-layout"
+import { Badge } from "@/components/ui/badge"
+import { Button } from "@/components/ui/button"
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card"
+import { Separator } from "@/components/ui/separator"
+import { ApiError, fetchJobById } from "@/lib/api"
+import {
+  formatCompanySize,
+  formatCurrency,
+  formatDateRelative,
+  truncateText,
+} from "@/lib/utils"
+import type { Company, Job } from "@/types/job"
+
+type JobPageProps = {
+  params: {
+    id: string
+  }
+}
+
+const intervalCopy: Record<string, string> = {
+  yearly: "per year",
+  monthly: "per month",
+  weekly: "per week",
+  hourly: "per hour",
+}
+
+const getCompensationDisplay = (job: Job) => {
+  const currency = job.compensation_currency ?? "USD"
+  const min =
+    typeof job.compensation_min === "number"
+      ? formatCurrency(job.compensation_min, currency)
+      : null
+  const max =
+    typeof job.compensation_max === "number"
+      ? formatCurrency(job.compensation_max, currency)
+      : null
+
+  if (!min && !max) {
+    return "Not specified"
+  }
+
+  const label = [min, max].filter(Boolean).join(" - ")
+  const intervalLabel = job.compensation_interval
+    ? intervalCopy[job.compensation_interval] ?? job.compensation_interval
+    : null
+
+  if (!intervalLabel) {
+    return label
+  }
+
+  return `${label} ${intervalLabel}`
+}
+
+const buildLocation = (job: Job) => {
+  const parts = [job.location_city, job.location_state, job.location_country]
+    .filter((part): part is string => Boolean(part))
+    .join(", ")
+
+  return parts || "Location to be announced"
+}
+
+export async function generateMetadata({
+  params,
+}: JobPageProps): Promise<Metadata> {
+  const jobId = Number.parseInt(params.id, 10)
+
+  if (Number.isNaN(jobId)) {
+    return {
+      title: "Job Not Found | Job Apply Assistant",
+      description: "The requested job could not be found.",
+    }
+  }
+
+  try {
+    const job = await fetchJobById(jobId)
+    const company = job.company_name ?? "Unknown Company"
+    const description = job.description
+      ? truncateText(job.description, 160)
+      : "Explore job opportunities with Job Apply Assistant."
+
+    return {
+      title: `${job.title} at ${company} | Job Apply Assistant`,
+      description,
+    }
+  } catch {
+    return {
+      title: "Job Not Found | Job Apply Assistant",
+      description: "The requested job could not be found.",
+    }
+  }
+}
+
+export default async function JobDetailPage({ params }: JobPageProps) {
+  const jobId = Number.parseInt(params.id, 10)
+
+  if (Number.isNaN(jobId)) {
+    notFound()
+  }
+
+  let job: Job | null = null
+  let company: Company | null = null
+
+  try {
+    const response = await fetchJobById(jobId)
+    job = response
+    company = response.company
+  } catch (error) {
+    if (error instanceof ApiError && error.statusCode === 404) {
+      notFound()
+    }
+
+    const message =
+      error instanceof Error
+        ? error.message
+        : "An unexpected error occurred while loading this job."
+
+    return (
+      <PageLayout>
+        <div className="container mx-auto py-10">
+          <Card className="mx-auto max-w-xl">
+            <CardHeader>
+              <CardTitle>Failed to load job details</CardTitle>
+              <CardDescription>{message}</CardDescription>
+            </CardHeader>
+            <CardContent className="flex flex-wrap gap-3">
+              <Button asChild>
+                <Link href="/">Back to jobs</Link>
+              </Button>
+            </CardContent>
+          </Card>
+        </div>
+      </PageLayout>
+    )
+  }
+
+  if (!job) {
+    notFound()
+  }
+
+  const location = buildLocation(job)
+  const compensation = getCompensationDisplay(job)
+  const posted = formatDateRelative(job.date_posted)
+
+  return (
+    <PageLayout>
+      <div className="container mx-auto py-10">
+        <Button
+          asChild
+          variant="ghost"
+          className="mb-6 w-fit px-0 text-muted-foreground hover:text-foreground"
+        >
+          <Link href="/" className="inline-flex items-center gap-2">
+            <ArrowLeft className="h-4 w-4" />
+            Back to Jobs
+          </Link>
+        </Button>
+
+        <Card>
+          <CardHeader className="space-y-3">
+            <div className="space-y-2">
+              <CardTitle className="text-3xl font-bold">
+                {job.title}
+              </CardTitle>
+              {job.company_name ? (
+                <CardDescription className="flex items-center gap-2 text-lg">
+                  <Briefcase className="h-4 w-4" />
+                  <span>{job.company_name}</span>
+                </CardDescription>
+              ) : null}
+            </div>
+          </CardHeader>
+          <CardContent>
+            <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
+              <div className="space-y-2">
+                <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                  <MapPin className="h-4 w-4" />
+                  Location
+                </div>
+                <p className="text-base font-medium">{location}</p>
+                {job.is_remote ? (
+                  <Badge variant="secondary" className="w-fit">
+                    Remote
+                  </Badge>
+                ) : null}
+              </div>
+
+              <div className="space-y-2">
+                <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                  <Briefcase className="h-4 w-4" />
+                  Job Type
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  {job.job_type?.length ? (
+                    job.job_type.map((type) => (
+                      <Badge key={type} variant="outline">
+                        {type}
+                      </Badge>
+                    ))
+                  ) : (
+                    <span className="text-muted-foreground">Not specified</span>
+                  )}
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                  <DollarSign className="h-4 w-4" />
+                  Compensation
+                </div>
+                <p className="text-base font-medium">{compensation}</p>
+              </div>
+
+              <div className="space-y-2">
+                <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                  <Calendar className="h-4 w-4" />
+                  Posted
+                </div>
+                <p className="text-base font-medium">{posted}</p>
+              </div>
+
+              {job.job_level ? (
+                <div className="space-y-2">
+                  <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                    <Users className="h-4 w-4" />
+                    Level
+                  </div>
+                  <Badge variant="outline" className="w-fit">
+                    {job.job_level}
+                  </Badge>
+                </div>
+              ) : null}
+
+              {job.job_function ? (
+                <div className="space-y-2">
+                  <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                    <Building2 className="h-4 w-4" />
+                    Function
+                  </div>
+                  <Badge variant="outline" className="w-fit">
+                    {job.job_function}
+                  </Badge>
+                </div>
+              ) : null}
+            </div>
+          </CardContent>
+        </Card>
+
+        <div className="mt-6 flex flex-wrap gap-3">
+          {job.job_url ? (
+            <Button asChild>
+              <Link href={job.job_url} target="_blank" rel="noreferrer">
+                Apply Now
+              </Link>
+            </Button>
+          ) : null}
+          <Button type="button" variant="outline">
+            Save Job
+          </Button>
+          <Button type="button" variant="ghost">
+            Share
+          </Button>
+        </div>
+
+        <Separator className="my-8" />
+
+        <Card>
+          <CardHeader>
+            <CardTitle>Job Description</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="prose prose-slate max-w-none prose-job-description whitespace-pre-wrap">
+              {job.description ?? "The hiring team will update this description soon."}
+            </div>
+          </CardContent>
+        </Card>
+
+        {company ? (
+          <>
+            <Separator className="my-8" />
+            <Card>
+              <CardHeader>
+                <CardTitle>About {company.name}</CardTitle>
+                {company.tagline ? (
+                  <CardDescription>{company.tagline}</CardDescription>
+                ) : null}
+              </CardHeader>
+              <CardContent className="space-y-6">
+                {company.description ? (
+                  <p className="text-base leading-7 text-muted-foreground">
+                    {company.description}
+                  </p>
+                ) : null}
+
+                <div className="grid gap-4 sm:grid-cols-2">
+                  <div className="space-y-1">
+                    <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                      <Building2 className="h-4 w-4" /> Industry
+                    </div>
+                    <p className="font-medium">
+                      {company.industry ?? "Not specified"}
+                    </p>
+                  </div>
+
+                  <div className="space-y-1">
+                    <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                      <Users className="h-4 w-4" /> Company Size
+                    </div>
+                    <p className="font-medium">
+                      {formatCompanySize(
+                        company.company_size_min,
+                        company.company_size_max
+                      )}
+                    </p>
+                  </div>
+
+                  <div className="space-y-1">
+                    <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                      <MapPin className="h-4 w-4" /> Headquarters
+                    </div>
+                    <p className="font-medium">
+                      {[company.hq_city, company.hq_state, company.hq_country]
+                        .filter((value): value is string => Boolean(value))
+                        .join(", ") || "Not specified"}
+                    </p>
+                  </div>
+
+                  <div className="space-y-1">
+                    <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                      <Calendar className="h-4 w-4" /> Founded
+                    </div>
+                    <p className="font-medium">
+                      {company.founded_year ?? "Not specified"}
+                    </p>
+                  </div>
+
+                  {company.website ? (
+                    <div className="space-y-1">
+                      <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                        <Globe className="h-4 w-4" /> Website
+                      </div>
+                      <Link
+                        href={company.website}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="inline-flex items-center gap-1 font-medium text-primary hover:underline"
+                      >
+                        Visit site
+                        <ExternalLink className="h-3.5 w-3.5" />
+                      </Link>
+                    </div>
+                  ) : null}
+
+                  {company.linkedin_url ? (
+                    <div className="space-y-1">
+                      <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                        <ExternalLink className="h-4 w-4" /> LinkedIn
+                      </div>
+                      <Link
+                        href={company.linkedin_url}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="inline-flex items-center gap-1 font-medium text-primary hover:underline"
+                      >
+                        View profile
+                        <ExternalLink className="h-3.5 w-3.5" />
+                      </Link>
+                    </div>
+                  ) : null}
+                </div>
+
+                {company.specialities?.length ? (
+                  <div>
+                    <p className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
+                      Specialities
+                    </p>
+                    <div className="mt-2 flex flex-wrap gap-2">
+                      {company.specialities.map((speciality) => (
+                        <Badge key={speciality} variant="secondary">
+                          {speciality}
+                        </Badge>
+                      ))}
+                    </div>
+                  </div>
+                ) : null}
+              </CardContent>
+            </Card>
+          </>
+        ) : null}
+
+        <Separator className="my-8" />
+
+        <Card>
+          <CardHeader>
+            <CardTitle>Additional Information</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <dl className="grid gap-4 sm:grid-cols-2">
+              <div>
+                <dt className="text-sm font-semibold text-muted-foreground">
+                  Listing Type
+                </dt>
+                <dd className="text-base font-medium">
+                  {job.listing_type ?? "Not specified"}
+                </dd>
+              </div>
+              <div>
+                <dt className="text-sm font-semibold text-muted-foreground">
+                  Company Industry
+                </dt>
+                <dd className="text-base font-medium">
+                  {job.company_industry ?? company?.industry ?? "Not specified"}
+                </dd>
+              </div>
+              <div>
+                <dt className="text-sm font-semibold text-muted-foreground">
+                  Company Headquarters
+                </dt>
+                <dd className="text-base font-medium">
+                  {job.company_headquarters ??
+                    [company?.hq_city, company?.hq_state, company?.hq_country]
+                      .filter((value): value is string => Boolean(value))
+                      .join(", ") || "Not specified"}
+                </dd>
+              </div>
+              <div>
+                <dt className="text-sm font-semibold text-muted-foreground">
+                  Company Employees
+                </dt>
+                <dd className="text-base font-medium">
+                  {job.company_employees_count ?? "Not specified"}
+                </dd>
+              </div>
+              <div className="sm:col-span-2">
+                <dt className="text-sm font-semibold text-muted-foreground">
+                  Contact Emails
+                </dt>
+                <dd className="mt-2 flex flex-wrap gap-3">
+                  {job.emails?.length ? (
+                    job.emails.map((email) => (
+                      <Link
+                        key={email}
+                        href={`mailto:${email}`}
+                        className="text-primary hover:underline"
+                      >
+                        {email}
+                      </Link>
+                    ))
+                  ) : (
+                    <span className="text-muted-foreground">Not provided</span>
+                  )}
+                </dd>
+              </div>
+            </dl>
+          </CardContent>
+        </Card>
+      </div>
+    </PageLayout>
+  )
+}
