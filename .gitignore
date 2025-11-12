@@ -211,6 +211,8 @@ __marimo__/
 # Job Apply Assistant backend
 .DS_Store
 postgres_data/
+models/
+llama-cache/
 backend/.venv/
 backend/.pdm-python
 backend/.pdm.toml
