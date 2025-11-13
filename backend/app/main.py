@@ -2,9 +2,14 @@ from datetime import datetime, timezone
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from loguru import logger
 
 from app.api.jobs import router as jobs_router
 from app.config import settings
+from app.logging_config import setup_logging
+
+# Configure logging with INFO level
+setup_logging(log_level="INFO")
 
 app = FastAPI(
     title="Job Apply Assistant API",
@@ -28,8 +33,9 @@ app.include_router(jobs_router)
 
 @app.on_event("startup")
 async def startup_event() -> None:
-    # Placeholder log; will be replaced with structured logging later
-    print("FastAPI application for Job Apply Assistant started")
+    logger.info("FastAPI application for Job Apply Assistant started")
+    logger.info(f"API version: {app.version}")
+    logger.info(f"CORS origins: {settings.CORS_ORIGINS or ['http://localhost:3000', 'http://127.0.0.1:3000']}")
 
 
 @app.get("/")

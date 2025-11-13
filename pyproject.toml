@@ -31,3 +31,39 @@ regex = "^2024.4.28"
 jupyter = "^1.0.0"
 black = "*"
 pre-commit = "*"
+
+[tool.pdm.dev-dependencies]
+dev = [
+    "jupyter<2.0.0,>=1.0.0",
+    "black",
+    "pre-commit",
+]
+
+[tool.pdm.build]
+includes = ["jobspy"]
+
+[project]
+authors = [
+    {name = "Cullen Watson", email = "cullen@cullenwatson.com"},
+    {name = "Zachary Hampton", email = "zachary@zacharysproducts.com"},
+]
+requires-python = "<4.0,>=3.10"
+dependencies = [
+    "requests<3.0.0,>=2.31.0",
+    "beautifulsoup4<5.0.0,>=4.12.2",
+    "pandas<3.0.0,>=2.1.0",
+    "NUMPY==1.26.3",
+    "pydantic<3.0.0,>=2.3.0",
+    "tls-client<2.0.0,>=1.0.1",
+    "markdownify<2.0.0,>=1.1.0",
+    "regex<2025.0.0,>=2024.4.28",
+    "nvitop>=1.6.0",
+]
+name = "python-jobspy"
+version = "1.1.82"
+description = "Job scraper for LinkedIn, Indeed, Glassdoor, ZipRecruiter & Bayt"
+readme = "README.md"
+keywords = ["jobs-scraper", "linkedin", "indeed", "glassdoor", "ziprecruiter", "bayt", "naukri"]
+
+[project.urls]
+homepage = "https://github.com/cullenwatson/JobSpy"

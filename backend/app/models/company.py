@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from sqlalchemy import Column, DateTime, Integer, String, Text, func
+from sqlalchemy import Boolean, Column, DateTime, Integer, String, Text, func
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import relationship
 
@@ -15,6 +15,8 @@ class Company(Base):
     linkedin_internal_id = Column(String(255), nullable=True)
     name = Column(String(255), nullable=False, index=True)
     description = Column(Text, nullable=True)
+    has_own_products = Column(Boolean, nullable=True)
+    is_recruiting_company = Column(Boolean, nullable=True)
     website = Column(String(512), nullable=True)
     industry = Column(String(255), nullable=True)
     company_size_min = Column(Integer, nullable=True)

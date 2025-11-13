@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import logging
 import time
 from datetime import date
 from typing import Any, Iterable
@@ -8,12 +7,12 @@ from urllib.parse import urlparse, urlunparse
 
 import pandas as pd
 import requests
+from loguru import logger
 
 from app.config import settings
 from app.models.company import Company
 from app.models.job import Job
-
-logger = logging.getLogger(__name__)
+from app.utils.company_description_parser import parse_company_description
 
 PROXYCURL_COMPANY_ENDPOINT = "https://enrichlayer.com/api/v2/company"
 
@@ -95,12 +94,16 @@ def map_proxycurl_to_company(
 ) -> Company:
     company_size = proxycurl_data.get("company_size") or []
     hq = proxycurl_data.get("hq") or {}
+    description = proxycurl_data.get("description")
+    description_insights = parse_company_description(description)
 
     return Company(
         linkedin_url=linkedin_url,
         linkedin_internal_id=proxycurl_data.get("linkedin_internal_id"),
         name=proxycurl_data.get("name") or "Unknown",
-        description=proxycurl_data.get("description"),
+        description=description,
+        has_own_products=description_insights.has_own_products,
+        is_recruiting_company=description_insights.is_recruiting_company,
         website=proxycurl_data.get("website"),
         industry=proxycurl_data.get("industry"),
         company_size_min=_safe_get_index(company_size, 0),

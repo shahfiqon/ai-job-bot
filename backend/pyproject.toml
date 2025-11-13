@@ -18,6 +18,8 @@ dependencies = [
     "python-dotenv",
     "pandas",
     "ipykernel>=7.1.0",
+    "loguru",
+    "ollama>=0.6.0",
 ]
 
 [project.scripts]

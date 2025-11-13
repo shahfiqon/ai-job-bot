@@ -12,6 +12,8 @@ class CompanyResponse(BaseModel):
     linkedin_internal_id: str | None = None
     name: str
     description: str | None = None
+    has_own_products: bool | None = None
+    is_recruiting_company: bool | None = None
     website: str | None = None
     industry: str | None = None
     company_size_min: int | None = None
@@ -37,4 +39,3 @@ class CompanyResponse(BaseModel):
     @field_serializer("created_at", "updated_at", when_used="json")
     def serialize_datetime(self, value: datetime) -> str:
         return value.isoformat()
-

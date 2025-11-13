@@ -52,6 +52,8 @@ export interface Company {
   linkedin_internal_id: string | null;
   name: string;
   description: string | null;
+  has_own_products: boolean | null;
+  is_recruiting_company: boolean | null;
   website: string | null;
   industry: string | null;
   company_size_min: number | null;

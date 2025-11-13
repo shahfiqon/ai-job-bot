@@ -5,6 +5,11 @@ from importlib import metadata
 import typer
 from rich.console import Console
 
+from app.logging_config import setup_logging
+
+# Configure logging with INFO level
+setup_logging(log_level="INFO")
+
 console = Console()
 
 app = typer.Typer(

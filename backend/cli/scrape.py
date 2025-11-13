@@ -1,9 +1,9 @@
 from __future__ import annotations
 
-import logging
 import pandas as pd
 import typer
 from jobspy import scrape_jobs as jobspy_scrape_jobs
+from loguru import logger
 from rich.panel import Panel
 from rich.progress import (
     BarColumn,
@@ -27,8 +27,6 @@ from cli.utils import (
     map_proxycurl_to_company,
     normalize_linkedin_url,
 )
-
-logger = logging.getLogger(__name__)
 
 
 @app.command()

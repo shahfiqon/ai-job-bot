@@ -11,6 +11,10 @@ class Settings(BaseSettings):
         default=None,
         description="Proxycurl API key for company enrichment (required for CLI scrape command)",
     )
+    OLLAMA_SERVER_URL: str = Field(
+        default="http://localhost:11434",
+        description="Ollama server URL for LLM-based job description parsing",
+    )
     CORS_ORIGINS: list[str] = Field(
         default_factory=lambda: [
             "http://localhost:3000",
