@@ -52,6 +52,29 @@ class Job(Base):
     company_headquarters = Column(String(255), nullable=True)
     company_employees_count = Column(String(128), nullable=True)
     emails = Column(JSONB, nullable=True)
+    
+    # LLM-parsed fields from job description
+    required_skills = Column(JSONB, nullable=True)
+    preferred_skills = Column(JSONB, nullable=True)
+    required_years_experience = Column(Integer, nullable=True)
+    required_education = Column(String(255), nullable=True)
+    preferred_education = Column(String(255), nullable=True)
+    responsibilities = Column(JSONB, nullable=True)
+    benefits = Column(JSONB, nullable=True)
+    work_arrangement = Column(String(64), nullable=True)
+    team_size = Column(String(128), nullable=True)
+    technologies = Column(JSONB, nullable=True)
+    culture_keywords = Column(JSONB, nullable=True)
+    summary = Column(Text, nullable=True)
+    job_categories = Column(JSONB, nullable=True)
+    independent_contractor_friendly = Column(Boolean, nullable=True)
+    parsed_salary_currency = Column(String(16), nullable=True)
+    parsed_salary_min = Column(Float, nullable=True)
+    parsed_salary_max = Column(Float, nullable=True)
+    compensation_basis = Column(String(64), nullable=True)
+    location_restrictions = Column(JSONB, nullable=True)
+    exclusive_location_requirement = Column(Boolean, nullable=True)
+    
     created_at = Column(
         DateTime(timezone=True),
         nullable=False,

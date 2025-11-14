@@ -42,6 +42,29 @@ export interface Job {
   company_headquarters: string | null;
   company_employees_count: string | null;
   emails: string[] | null;
+  
+  // LLM-parsed fields from job description
+  required_skills: string[] | null;
+  preferred_skills: string[] | null;
+  required_years_experience: number | null;
+  required_education: string | null;
+  preferred_education: string | null;
+  responsibilities: string[] | null;
+  benefits: string[] | null;
+  work_arrangement: string | null;
+  team_size: string | null;
+  technologies: string[] | null;
+  culture_keywords: string[] | null;
+  summary: string | null;
+  job_categories: string[] | null;
+  independent_contractor_friendly: boolean | null;
+  parsed_salary_currency: string | null;
+  parsed_salary_min: number | null;
+  parsed_salary_max: number | null;
+  compensation_basis: string | null;
+  location_restrictions: string[] | null;
+  exclusive_location_requirement: boolean | null;
+  
   created_at: Date;
   updated_at: Date;
 }
@@ -73,4 +96,8 @@ export interface Company {
   locations: Array<Record<string, unknown>> | null;
   created_at: Date;
   updated_at: Date;
+}
+
+export interface JobDetail extends Job {
+  company: Company | null;
 }

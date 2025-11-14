@@ -12,6 +12,7 @@ from loguru import logger
 from app.config import settings
 from app.models.company import Company
 from app.models.job import Job
+from app.schemas.structured_job import StructuredJobData
 from app.utils.company_description_parser import parse_company_description
 
 PROXYCURL_COMPANY_ENDPOINT = "https://enrichlayer.com/api/v2/company"
@@ -124,38 +125,69 @@ def map_proxycurl_to_company(
     )
 
 
-def map_dataframe_row_to_job(row: pd.Series, company_id: int | None) -> Job:
+def map_dataframe_row_to_job(
+    row: pd.Series,
+    company_id: int | None,
+    structured_data: StructuredJobData | None = None,
+) -> Job:
     city, state, country = parse_location_string(row.get("location"))
     job_types = _split_to_list(row.get("job_type"))
     emails = _split_to_list(row.get("emails"))
 
-    return Job(
-        job_url=_safe_str(row.get("job_url")),
-        job_url_direct=_safe_str(row.get("job_url_direct")),
-        title=_safe_str(row.get("title")) or "Untitled Role",
-        company_name=_safe_str(row.get("company")),
-        company_id=company_id,
-        description=_safe_str(row.get("description")),
-        company_url=_safe_str(row.get("company_url")),
-        company_url_direct=_safe_str(row.get("company_url_direct")),
-        location_city=city,
-        location_state=state,
-        location_country=country,
-        compensation_min=_safe_float(row.get("min_amount")),
-        compensation_max=_safe_float(row.get("max_amount")),
-        compensation_currency=_safe_str(row.get("currency")),
-        compensation_interval=_safe_str(row.get("interval")),
-        job_type=job_types,
-        date_posted=_coerce_date(row.get("date_posted")),
-        is_remote=_safe_bool(row.get("is_remote")),
-        listing_type=_safe_str(row.get("listing_type")),
-        job_level=_safe_str(row.get("job_level")),
-        job_function=_safe_str(row.get("job_function")),
-        company_industry=_safe_str(row.get("company_industry")),
-        company_headquarters=_safe_str(row.get("company_headquarters")),
-        company_employees_count=_safe_str(row.get("company_employees_count")),
-        emails=emails,
-    )
+    job_kwargs = {
+        "job_url": _safe_str(row.get("job_url")),
+        "job_url_direct": _safe_str(row.get("job_url_direct")),
+        "title": _safe_str(row.get("title")) or "Untitled Role",
+        "company_name": _safe_str(row.get("company")),
+        "company_id": company_id,
+        "description": _safe_str(row.get("description")),
+        "company_url": _safe_str(row.get("company_url")),
+        "company_url_direct": _safe_str(row.get("company_url_direct")),
+        "location_city": city,
+        "location_state": state,
+        "location_country": country,
+        "compensation_min": _safe_float(row.get("min_amount")),
+        "compensation_max": _safe_float(row.get("max_amount")),
+        "compensation_currency": _safe_str(row.get("currency")),
+        "compensation_interval": _safe_str(row.get("interval")),
+        "job_type": job_types,
+        "date_posted": _coerce_date(row.get("date_posted")),
+        "is_remote": _safe_bool(row.get("is_remote")),
+        "listing_type": _safe_str(row.get("listing_type")),
+        "job_level": _safe_str(row.get("job_level")),
+        "job_function": _safe_str(row.get("job_function")),
+        "company_industry": _safe_str(row.get("company_industry")),
+        "company_headquarters": _safe_str(row.get("company_headquarters")),
+        "company_employees_count": _safe_str(row.get("company_employees_count")),
+        "emails": emails,
+    }
+
+    # Add LLM-parsed fields if available
+    if structured_data:
+        job_kwargs.update({
+            "required_skills": _coerce_json_field(structured_data.required_skills),
+            "preferred_skills": _coerce_json_field(structured_data.preferred_skills),
+            "required_years_experience": structured_data.required_years_experience,
+            "required_education": structured_data.required_education,
+            "preferred_education": structured_data.preferred_education,
+            "responsibilities": _coerce_json_field(structured_data.responsibilities),
+            "benefits": _coerce_json_field(structured_data.benefits),
+            "work_arrangement": structured_data.work_arrangement,
+            "team_size": structured_data.team_size,
+            "technologies": _coerce_json_field(structured_data.technologies),
+            "culture_keywords": _coerce_json_field(structured_data.culture_keywords),
+            "summary": structured_data.summary,
+            "job_categories": _coerce_json_field(structured_data.job_categories),
+            "independent_contractor_friendly": structured_data.independent_contractor_friendly,
+            "parsed_salary_currency": structured_data.salary_currency,
+            "parsed_salary_min": structured_data.salary_min,
+            "parsed_salary_max": structured_data.salary_max,
+            "compensation_basis": structured_data.compensation_basis,
+            "location_restrictions": _coerce_json_field(structured_data.location_restrictions),
+            "exclusive_location_requirement": structured_data.exclusive_location_requirement,
+        })
+
+    return Job(**job_kwargs)
 
 
 def parse_location_string(

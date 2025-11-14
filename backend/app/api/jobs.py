@@ -3,11 +3,12 @@ from __future__ import annotations
 import math
 
 from fastapi import APIRouter, Depends, HTTPException, Query
-from sqlalchemy import func
+from sqlalchemy import and_, func, or_
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session, joinedload
 
 from app.db import get_db
+from app.models.company import Company
 from app.models.job import Job
 from app.schemas import JobDetailResponse, JobListItemResponse, JobListResponse
 
@@ -26,15 +27,104 @@ def list_jobs(
         le=100,
         description="Number of items per page",
     ),
+    job_categories: str | None = Query(
+        default=None,
+        description="Comma-separated list of job categories to filter by",
+    ),
+    technologies: str | None = Query(
+        default=None,
+        description="Comma-separated list of technologies to filter by (partial match)",
+    ),
+    required_skills: str | None = Query(
+        default=None,
+        description="Comma-separated list of required skills to filter by (partial match)",
+    ),
+    work_arrangement: str | None = Query(
+        default=None,
+        description="Work arrangement filter (Remote, Hybrid, On-site)",
+    ),
+    min_years_experience: int | None = Query(
+        default=None,
+        ge=0,
+        description="Minimum years of experience required",
+    ),
+    independent_contractor_friendly: bool | None = Query(
+        default=None,
+        description="Filter for independent contractor friendly positions",
+    ),
+    has_own_products: bool | None = Query(
+        default=None,
+        description="Filter by whether the company has its own products",
+    ),
+    is_recruiting_company: bool | None = Query(
+        default=None,
+        description="Filter by whether the company is a recruiting company",
+    ),
     db: Session = Depends(get_db),
 ) -> JobListResponse:
-    """Return a paginated list of jobs ordered by most recent posting."""
+    """Return a paginated list of jobs ordered by most recent posting with optional filters."""
     try:
-        total = db.query(func.count(Job.id)).scalar() or 0
+        # Build base query
+        query = db.query(Job)
+        
+        # Apply filters
+        filters = []
+        
+        if job_categories:
+            categories_list = [cat.strip() for cat in job_categories.split(",") if cat.strip()]
+            if categories_list:
+                # Check if any of the requested categories exist in the job_categories JSONB array
+                category_filters = [
+                    Job.job_categories.contains([category]) for category in categories_list
+                ]
+                filters.append(or_(*category_filters))
+        
+        if technologies:
+            tech_list = [tech.strip() for tech in technologies.split(",") if tech.strip()]
+            if tech_list:
+                # Check if any of the requested technologies exist in the technologies JSONB array
+                tech_filters = [
+                    Job.technologies.contains([tech]) for tech in tech_list
+                ]
+                filters.append(or_(*tech_filters))
+        
+        if required_skills:
+            skills_list = [skill.strip() for skill in required_skills.split(",") if skill.strip()]
+            if skills_list:
+                # Check if any of the requested skills exist in required_skills JSONB array
+                skill_filters = [
+                    Job.required_skills.contains([skill]) for skill in skills_list
+                ]
+                filters.append(or_(*skill_filters))
+        
+        if work_arrangement:
+            filters.append(Job.work_arrangement == work_arrangement)
+        
+        if min_years_experience is not None:
+            filters.append(Job.required_years_experience >= min_years_experience)
+        
+        if independent_contractor_friendly is not None:
+            filters.append(Job.independent_contractor_friendly == independent_contractor_friendly)
+        
+        # Company filters - need to join with Company table
+        if has_own_products is not None or is_recruiting_company is not None:
+            query = query.join(Company, Job.company_id == Company.id)
+            if has_own_products is not None:
+                filters.append(Company.has_own_products == has_own_products)
+            if is_recruiting_company is not None:
+                filters.append(Company.is_recruiting_company == is_recruiting_company)
+        
+        # Apply all filters
+        if filters:
+            query = query.filter(and_(*filters))
+        
+        # Get total count
+        total = query.with_entities(func.count(Job.id)).scalar() or 0
         offset = (page - 1) * page_size
 
+        # Get paginated results
         jobs = (
-            db.query(Job)
+            query
             .order_by(
                 Job.date_posted.desc().nulls_last(),
                 Job.created_at.desc(),

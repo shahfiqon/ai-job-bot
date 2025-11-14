@@ -67,6 +67,24 @@ const JobsTable = ({ jobs }: JobsTableProps) => {
                     <Briefcase className="h-4 w-4" />
                     <span>{job.company_name ?? "Confidential company"}</span>
                   </div>
+                  {/* Display job categories and technologies */}
+                  <div className="flex flex-wrap gap-1 mt-2">
+                    {job.job_categories?.slice(0, 3).map((category) => (
+                      <Badge key={category} variant="secondary" className="text-xs">
+                        {category}
+                      </Badge>
+                    ))}
+                    {job.technologies?.slice(0, 3).map((tech) => (
+                      <Badge key={tech} variant="outline" className="text-xs">
+                        {tech}
+                      </Badge>
+                    ))}
+                  </div>
+                  {job.work_arrangement && (
+                    <div className="text-xs text-muted-foreground mt-1">
+                      {job.work_arrangement}
+                    </div>
+                  )}
                 </div>
               </TableCell>
               <TableCell className="hidden text-sm text-muted-foreground md:table-cell">
@@ -107,7 +125,7 @@ const JobsTable = ({ jobs }: JobsTableProps) => {
                 </div>
               </TableCell>
               <TableCell className="text-sm text-muted-foreground">
-                {formatDateRelative(job.date_posted)}
+                {job.date_posted ? formatDateRelative(job.date_posted) : "Not specified"}
               </TableCell>
             </TableRow>
           );

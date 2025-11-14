@@ -35,6 +35,29 @@ class JobBaseResponse(BaseModel):
     company_headquarters: str | None = None
     company_employees_count: str | None = None
     emails: list[str] | None = None
+    
+    # LLM-parsed fields from job description
+    required_skills: list[str] | None = None
+    preferred_skills: list[str] | None = None
+    required_years_experience: int | None = None
+    required_education: str | None = None
+    preferred_education: str | None = None
+    responsibilities: list[str] | None = None
+    benefits: list[str] | None = None
+    work_arrangement: str | None = None
+    team_size: str | None = None
+    technologies: list[str] | None = None
+    culture_keywords: list[str] | None = None
+    summary: str | None = None
+    job_categories: list[str] | None = None
+    independent_contractor_friendly: bool | None = None
+    parsed_salary_currency: str | None = None
+    parsed_salary_min: float | None = None
+    parsed_salary_max: float | None = None
+    compensation_basis: str | None = None
+    location_restrictions: list[str] | None = None
+    exclusive_location_requirement: bool | None = None
+    
     created_at: datetime
     updated_at: datetime
 

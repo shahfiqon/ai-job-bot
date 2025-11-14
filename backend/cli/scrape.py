@@ -20,6 +20,7 @@ from app.config import settings
 from app.db import SessionLocal
 from app.models.company import Company
 from app.models.job import Job
+from app.utils.ollama_utils import parse_job_description_with_ollama
 from cli.main import app, console
 from cli.utils import (
     fetch_company_from_proxycurl,
@@ -152,6 +153,46 @@ def scrape(
                 progress.update(company_task, completed=len(linkedin_urls))
                 session.commit()
 
+            # Parse job descriptions with LLM
+            console.print("[cyan]Parsing job descriptions with LLM...[/]")
+            parsing_task = progress.add_task(
+                "[bold]Parsing job descriptions with LLM...[/bold]",
+                total=len(jobs_df),
+            )
+            
+            parsed_data_map = {}
+            parse_stats = {
+                "success": 0,
+                "failed": 0,
+            }
+            
+            for idx, row in jobs_df.iterrows():
+                description = row.get("description")
+                if description and isinstance(description, str) and description.strip():
+                    result = parse_job_description_with_ollama(
+                        description=description,
+                        timeout=240,
+                    )
+                    if result["success"] and result["data"]:
+                        parsed_data_map[idx] = result["data"]
+                        parse_stats["success"] += 1
+                        logger.debug(f"Successfully parsed job at index {idx}")
+                    else:
+                        parse_stats["failed"] += 1
+                        logger.warning(f"Failed to parse job at index {idx}: {result.get('error')}")
+                else:
+                    parse_stats["failed"] += 1
+                    logger.debug(f"No description for job at index {idx}")
+                
+                progress.advance(parsing_task, 1)
+            
+            progress.update(parsing_task, completed=len(jobs_df))
+            console.print(
+                f"[green]Parsed {parse_stats['success']} job descriptions successfully, "
+                f"{parse_stats['failed']} failed or skipped.[/]"
+            )
+            
+            # Store jobs in database with parsed data
             jobs_task = progress.add_task(
                 "[bold]Storing jobs in database...[/bold]",
                 total=len(jobs_df),
@@ -160,12 +201,14 @@ def scrape(
                 "created": 0,
                 "skipped": 0,
             }
-            for _, row in jobs_df.iterrows():
+            for idx, row in jobs_df.iterrows():
+                structured_data = parsed_data_map.get(idx)
                 _ = _persist_job(
                     session=session,
                     row=row,
                     company_cache=company_cache,
                     job_stats=job_stats,
+                    structured_data=structured_data,
                 )
                 progress.advance(jobs_task, 1)
             progress.update(jobs_task, completed=len(jobs_df))
@@ -251,6 +294,7 @@ def _persist_job(
     row: pd.Series,
     company_cache: dict[str, int],
     job_stats: dict[str, int],
+    structured_data=None,
 ) -> Job | None:
     job_url = row.get("job_url")
     if not job_url:
@@ -276,7 +320,7 @@ def _persist_job(
 
     try:
         with session.begin_nested():
-            job = map_dataframe_row_to_job(row, company_id)
+            job = map_dataframe_row_to_job(row, company_id, structured_data)
             session.add(job)
             session.flush()
         job_stats["created"] += 1

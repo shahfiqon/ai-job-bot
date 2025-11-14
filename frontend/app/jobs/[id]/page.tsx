@@ -31,7 +31,7 @@ import {
   formatDateRelative,
   truncateText,
 } from "@/lib/utils"
-import type { Company, Job } from "@/types/job"
+import type { Company, Job, JobDetail } from "@/types/job"
 
 type JobPageProps = {
   params: {
@@ -119,13 +119,13 @@ export default async function JobDetailPage({ params }: JobPageProps) {
     notFound()
   }
 
-  let job: Job | null = null
+  let job: JobDetail | null = null
   let company: Company | null = null
 
   try {
     const response = await fetchJobById(jobId)
     job = response
-    company = response.company
+    company = response.company ?? null
   } catch (error) {
     if (error instanceof ApiError && error.statusCode === 404) {
       notFound()
@@ -161,7 +161,7 @@ export default async function JobDetailPage({ params }: JobPageProps) {
 
   const location = buildLocation(job)
   const compensation = getCompensationDisplay(job)
-  const posted = formatDateRelative(job.date_posted)
+  const posted = job.date_posted ? formatDateRelative(job.date_posted) : "Not specified"
 
   return (
     <PageLayout>
@@ -295,6 +295,228 @@ export default async function JobDetailPage({ params }: JobPageProps) {
             </div>
           </CardContent>
         </Card>
+
+        {/* LLM-Parsed Job Details */}
+        {(job.summary || 
+          job.job_categories?.length || 
+          job.technologies?.length ||
+          job.required_skills?.length ||
+          job.preferred_skills?.length ||
+          job.responsibilities?.length ||
+          job.benefits?.length ||
+          job.required_education ||
+          job.required_years_experience !== null) && (
+          <>
+            <Separator className="my-8" />
+            
+            {/* Summary */}
+            {job.summary && (
+              <Card>
+                <CardHeader>
+                  <CardTitle>Summary</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <p className="text-base leading-7">{job.summary}</p>
+                </CardContent>
+              </Card>
+            )}
+
+            {/* Job Categories & Technologies */}
+            {(job.job_categories?.length || job.technologies?.length) && (
+              <Card className="mt-6">
+                <CardHeader>
+                  <CardTitle>Categories & Technologies</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  {job.job_categories?.length ? (
+                    <div>
+                      <h4 className="text-sm font-medium text-muted-foreground mb-2">Categories</h4>
+                      <div className="flex flex-wrap gap-2">
+                        {job.job_categories.map((category) => (
+                          <Badge key={category} variant="secondary">
+                            {category}
+                          </Badge>
+                        ))}
+                      </div>
+                    </div>
+                  ) : null}
+                  {job.technologies?.length ? (
+                    <div>
+                      <h4 className="text-sm font-medium text-muted-foreground mb-2">Technologies</h4>
+                      <div className="flex flex-wrap gap-2">
+                        {job.technologies.map((tech) => (
+                          <Badge key={tech} variant="outline">
+                            {tech}
+                          </Badge>
+                        ))}
+                      </div>
+                    </div>
+                  ) : null}
+                </CardContent>
+              </Card>
+            )}
+
+            {/* Requirements */}
+            {(job.required_skills?.length || 
+              job.preferred_skills?.length || 
+              job.required_education || 
+              job.required_years_experience !== null) && (
+              <Card className="mt-6">
+                <CardHeader>
+                  <CardTitle>Requirements</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  {job.required_years_experience !== null && (
+                    <div>
+                      <h4 className="text-sm font-medium text-muted-foreground mb-1">Experience</h4>
+                      <p className="text-base">{job.required_years_experience}+ years</p>
+                    </div>
+                  )}
+                  {job.required_education && (
+                    <div>
+                      <h4 className="text-sm font-medium text-muted-foreground mb-1">Education</h4>
+                      <p className="text-base">{job.required_education}</p>
+                      {job.preferred_education && (
+                        <p className="text-sm text-muted-foreground mt-1">
+                          Preferred: {job.preferred_education}
+                        </p>
+                      )}
+                    </div>
+                  )}
+                  {job.required_skills?.length ? (
+                    <div>
+                      <h4 className="text-sm font-medium text-muted-foreground mb-2">Required Skills</h4>
+                      <ul className="list-disc list-inside space-y-1">
+                        {job.required_skills.map((skill, idx) => (
+                          <li key={idx} className="text-base">{skill}</li>
+                        ))}
+                      </ul>
+                    </div>
+                  ) : null}
+                  {job.preferred_skills?.length ? (
+                    <div>
+                      <h4 className="text-sm font-medium text-muted-foreground mb-2">Preferred Skills</h4>
+                      <ul className="list-disc list-inside space-y-1">
+                        {job.preferred_skills.map((skill, idx) => (
+                          <li key={idx} className="text-base text-muted-foreground">{skill}</li>
+                        ))}
+                      </ul>
+                    </div>
+                  ) : null}
+                </CardContent>
+              </Card>
+            )}
+
+            {/* Responsibilities */}
+            {job.responsibilities?.length ? (
+              <Card className="mt-6">
+                <CardHeader>
+                  <CardTitle>Responsibilities</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <ul className="list-disc list-inside space-y-2">
+                    {job.responsibilities.map((responsibility, idx) => (
+                      <li key={idx} className="text-base leading-7">{responsibility}</li>
+                    ))}
+                  </ul>
+                </CardContent>
+              </Card>
+            ) : null}
+
+            {/* Benefits & Compensation */}
+            {(job.benefits?.length || 
+              job.parsed_salary_min || 
+              job.parsed_salary_max || 
+              job.compensation_basis ||
+              job.independent_contractor_friendly !== null) && (
+              <Card className="mt-6">
+                <CardHeader>
+                  <CardTitle>Benefits & Compensation</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  {(job.parsed_salary_min || job.parsed_salary_max) && (
+                    <div>
+                      <h4 className="text-sm font-medium text-muted-foreground mb-1">Salary Range</h4>
+                      <p className="text-base">
+                        {job.parsed_salary_currency || "USD"}{" "}
+                        {job.parsed_salary_min && formatCurrency(job.parsed_salary_min, job.parsed_salary_currency || "USD")}
+                        {job.parsed_salary_min && job.parsed_salary_max && " - "}
+                        {job.parsed_salary_max && formatCurrency(job.parsed_salary_max, job.parsed_salary_currency || "USD")}
+                        {job.compensation_basis && ` (${job.compensation_basis})`}
+                      </p>
+                    </div>
+                  )}
+                  {job.independent_contractor_friendly && (
+                    <div>
+                      <Badge variant="secondary">Independent Contractor Friendly</Badge>
+                    </div>
+                  )}
+                  {job.benefits?.length ? (
+                    <div>
+                      <h4 className="text-sm font-medium text-muted-foreground mb-2">Benefits</h4>
+                      <ul className="list-disc list-inside space-y-1">
+                        {job.benefits.map((benefit, idx) => (
+                          <li key={idx} className="text-base">{benefit}</li>
+                        ))}
+                      </ul>
+                    </div>
+                  ) : null}
+                </CardContent>
+              </Card>
+            )}
+
+            {/* Work Details */}
+            {(job.work_arrangement || 
+              job.team_size || 
+              job.location_restrictions?.length ||
+              job.culture_keywords?.length) && (
+              <Card className="mt-6">
+                <CardHeader>
+                  <CardTitle>Work Details</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  {job.work_arrangement && (
+                    <div>
+                      <h4 className="text-sm font-medium text-muted-foreground mb-1">Work Arrangement</h4>
+                      <Badge variant="outline">{job.work_arrangement}</Badge>
+                    </div>
+                  )}
+                  {job.team_size && (
+                    <div>
+                      <h4 className="text-sm font-medium text-muted-foreground mb-1">Team Size</h4>
+                      <p className="text-base">{job.team_size}</p>
+                    </div>
+                  )}
+                  {job.location_restrictions?.length ? (
+                    <div>
+                      <h4 className="text-sm font-medium text-muted-foreground mb-1">Location Requirements</h4>
+                      <div className="flex flex-wrap gap-2">
+                        {job.location_restrictions.map((location, idx) => (
+                          <Badge key={idx} variant="secondary">{location}</Badge>
+                        ))}
+                      </div>
+                      {job.exclusive_location_requirement && (
+                        <p className="text-sm text-muted-foreground mt-2">
+                          * Must be located in one of these regions
+                        </p>
+                      )}
+                    </div>
+                  ) : null}
+                  {job.culture_keywords?.length ? (
+                    <div>
+                      <h4 className="text-sm font-medium text-muted-foreground mb-2">Culture</h4>
+                      <div className="flex flex-wrap gap-2">
+                        {job.culture_keywords.map((keyword, idx) => (
+                          <Badge key={idx} variant="outline">{keyword}</Badge>
+                        ))}
+                      </div>
+                    </div>
+                  ) : null}
+                </CardContent>
+              </Card>
+            )}
+          </>
+        )}
 
         {company ? (
           <>
@@ -439,9 +661,9 @@ export default async function JobDetailPage({ params }: JobPageProps) {
                 </dt>
                 <dd className="text-base font-medium">
                   {job.company_headquarters ??
-                    [company?.hq_city, company?.hq_state, company?.hq_country]
+                    ([company?.hq_city, company?.hq_state, company?.hq_country]
                       .filter((value): value is string => Boolean(value))
-                      .join(", ") || "Not specified"}
+                      .join(", ") || "Not specified")}
                 </dd>
               </div>
               <div>
