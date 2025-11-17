@@ -20,7 +20,9 @@ export default function JobsListWithFilters() {
   const [page, setPage] = useState(1);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [filters, setFilters] = useState<JobFilters>({});
+  const [filters, setFilters] = useState<JobFilters>({
+    max_employee_size: 111, // Default: exclude companies larger than 111 employees
+  });
 
   useEffect(() => {
     const loadJobs = async () => {
@@ -50,7 +52,9 @@ export default function JobsListWithFilters() {
   };
 
   const handleClearFilters = () => {
-    setFilters({});
+    setFilters({
+      max_employee_size: 111, // Always keep max_employee_size at 111 to exclude large companies
+    });
     setPage(1);
   };
 

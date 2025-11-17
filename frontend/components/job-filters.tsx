@@ -104,7 +104,8 @@ export default function JobFiltersComponent({
     filters.has_own_products !== undefined ? 1 : 0,
     filters.is_recruiting_company !== undefined ? 1 : 0,
     filters.min_employee_size !== undefined ? 1 : 0,
-    filters.max_employee_size !== undefined ? 1 : 0,
+    // Don't count max_employee_size when it's 111 (the default)
+    filters.max_employee_size !== undefined && filters.max_employee_size !== 111 ? 1 : 0,
   ].reduce((sum: number, count: number) => sum + count, 0);
 
   return (
@@ -301,7 +302,7 @@ export default function JobFiltersComponent({
           {/* Employee Size */}
           <div>
             <Label className="text-sm font-medium mb-2 block">
-              Company Employee Size
+              Company Employee Size (1-500 range)
             </Label>
             <div className="space-y-3">
               <div>
@@ -313,15 +314,16 @@ export default function JobFiltersComponent({
                 </Label>
                 <div className="flex items-center gap-4">
                   <Slider
-                    value={[filters.min_employee_size || 0]}
+                    value={[filters.min_employee_size || 1]}
                     onValueChange={([value]: number[]) =>
                       onFiltersChange({
                         ...filters,
-                        min_employee_size: value === 0 ? undefined : value,
+                        min_employee_size: value === 1 ? undefined : value,
                       })
                     }
-                    max={100000}
-                    step={100}
+                    min={1}
+                    max={500}
+                    step={10}
                     className="flex-1"
                   />
                   {filters.min_employee_size !== undefined && (
@@ -345,29 +347,30 @@ export default function JobFiltersComponent({
                   Maximum:{" "}
                   {filters.max_employee_size !== undefined
                     ? filters.max_employee_size.toLocaleString()
-                    : "Any"}
+                    : "111 (default)"}
                 </Label>
                 <div className="flex items-center gap-4">
                   <Slider
-                    value={[filters.max_employee_size || 100000]}
+                    value={[filters.max_employee_size ?? 111]}
                     onValueChange={([value]: number[]) =>
                       onFiltersChange({
                         ...filters,
-                        max_employee_size: value === 100000 ? undefined : value,
+                        max_employee_size: value === 111 ? 111 : value,
                       })
                     }
-                    max={100000}
-                    step={100}
+                    min={1}
+                    max={500}
+                    step={10}
                     className="flex-1"
                   />
-                  {filters.max_employee_size !== undefined && (
+                  {filters.max_employee_size !== 111 && (
                     <Button
                       variant="ghost"
                       size="sm"
                       onClick={() =>
                         onFiltersChange({
                           ...filters,
-                          max_employee_size: undefined,
+                          max_employee_size: 111,
                         })
                       }
                     >
