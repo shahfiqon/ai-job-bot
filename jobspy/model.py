@@ -276,6 +276,7 @@ class JobPost(BaseModel):
     company_employees_count: str | None = None
     job_poster_name: str | None = None
     job_poster_profile_url: str | None = None
+    applicants_count: int | None = None  # Number of applicants who applied
 
     # Naukri specific
     skills: list[str] | None = None  #from tagsAndSkills

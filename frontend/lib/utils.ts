@@ -54,6 +54,18 @@ export function formatDateRelative(date: string | Date): string {
 }
 
 /**
+ * Format a date as an absolute date (e.g., "November 15, 2024")
+ */
+export function formatDateAbsolute(date: string | Date): string {
+  const dateObj = typeof date === "string" ? new Date(date) : date;
+  return new Intl.DateTimeFormat("en-US", {
+    year: "numeric",
+    month: "long",
+    day: "numeric",
+  }).format(dateObj);
+}
+
+/**
  * Format company size from min/max values
  */
 export function formatCompanySize(

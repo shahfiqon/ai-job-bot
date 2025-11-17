@@ -34,6 +34,7 @@ class JobBaseResponse(BaseModel):
     company_industry: str | None = None
     company_headquarters: str | None = None
     company_employees_count: str | None = None
+    applicants_count: int | None = None
     # Company employee size fields (from Company model)
     company_size_min: int | None = None
     company_size_max: int | None = None

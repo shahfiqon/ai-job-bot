@@ -41,6 +41,7 @@ export interface Job {
   company_industry: string | null;
   company_headquarters: string | null;
   company_employees_count: string | null;
+  applicants_count: number | null;
   // Company employee size fields (from Company model)
   company_size_min: number | null;
   company_size_max: number | null;

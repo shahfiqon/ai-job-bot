@@ -52,6 +52,12 @@ export interface JobFilters {
   is_recruiting_company?: boolean;
   min_employee_size?: number;
   max_employee_size?: number;
+  // Applicants count filters
+  min_applicants_count?: number;
+  max_applicants_count?: number;
+  // Date posted filters
+  date_posted_from?: string; // ISO date string (YYYY-MM-DD)
+  date_posted_to?: string; // ISO date string (YYYY-MM-DD)
 }
 
 /**
@@ -109,6 +115,18 @@ export async function fetchJobs(
     }
     if (filters.max_employee_size !== undefined) {
       searchParams.append("max_employee_size", String(filters.max_employee_size));
+    }
+    if (filters.min_applicants_count !== undefined) {
+      searchParams.append("min_applicants_count", String(filters.min_applicants_count));
+    }
+    if (filters.max_applicants_count !== undefined) {
+      searchParams.append("max_applicants_count", String(filters.max_applicants_count));
+    }
+    if (filters.date_posted_from) {
+      searchParams.append("date_posted_from", filters.date_posted_from);
+    }
+    if (filters.date_posted_to) {
+      searchParams.append("date_posted_to", filters.date_posted_to);
     }
   }
 

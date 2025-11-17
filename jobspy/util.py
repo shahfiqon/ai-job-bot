@@ -333,6 +333,7 @@ desired_order = [
     "company",
     "location",
     "date_posted",
+    "applicants_count",
     "job_type",
     "salary_source",
     "interval",

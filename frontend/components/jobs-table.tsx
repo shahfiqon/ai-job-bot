@@ -1,6 +1,5 @@
 "use client";
 
-import { useRouter } from "next/navigation";
 import { Briefcase, DollarSign, MapPin } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -12,15 +11,13 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import type { Job, JobType } from "@/types/job";
-import { formatCurrency, formatDateRelative } from "@/lib/utils";
+import { formatCurrency, formatDateRelative, formatDateAbsolute } from "@/lib/utils";
 
 type JobsTableProps = {
   jobs: Job[];
 };
 
 const JobsTable = ({ jobs }: JobsTableProps) => {
-  const router = useRouter();
-
   if (!jobs?.length) {
     return (
       <div className="rounded-lg border bg-card p-8 text-center text-muted-foreground">
@@ -37,6 +34,7 @@ const JobsTable = ({ jobs }: JobsTableProps) => {
           <TableHead className="hidden md:table-cell">Location</TableHead>
           <TableHead>Type</TableHead>
           <TableHead className="hidden lg:table-cell">Salary</TableHead>
+          <TableHead className="hidden md:table-cell">Applicants</TableHead>
           <TableHead>Posted</TableHead>
         </TableRow>
       </TableHeader>
@@ -50,11 +48,11 @@ const JobsTable = ({ jobs }: JobsTableProps) => {
               key={`${job.id}-${job.title}`}
               role="link"
               tabIndex={0}
-              onClick={() => router.push(`/jobs/${job.id}`)}
+              onClick={() => window.open(`/jobs/${job.id}`, "_blank", "noopener,noreferrer")}
               onKeyDown={(event) => {
                 if (event.key === "Enter" || event.key === " ") {
                   event.preventDefault();
-                  router.push(`/jobs/${job.id}`);
+                  window.open(`/jobs/${job.id}`, "_blank", "noopener,noreferrer");
                 }
               }}
             >
@@ -129,8 +127,22 @@ const JobsTable = ({ jobs }: JobsTableProps) => {
                   <span>{formatCompensation(job)}</span>
                 </div>
               </TableCell>
+              <TableCell className="hidden text-sm text-muted-foreground md:table-cell">
+                {job.applicants_count !== null && job.applicants_count !== undefined ? (
+                  <span>{formatNumber(job.applicants_count)}</span>
+                ) : (
+                  <span className="text-muted-foreground/50">—</span>
+                )}
+              </TableCell>
               <TableCell className="text-sm text-muted-foreground">
-                {job.date_posted ? formatDateRelative(job.date_posted) : "Not specified"}
+                {job.date_posted ? (
+                  <div className="flex flex-col">
+                    <span>{formatDateRelative(job.date_posted)}</span>
+                    <span className="text-xs opacity-75">{formatDateAbsolute(job.date_posted)}</span>
+                  </div>
+                ) : (
+                  "Not specified"
+                )}
               </TableCell>
             </TableRow>
           );

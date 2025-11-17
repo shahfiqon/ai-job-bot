@@ -1,3 +1,6 @@
+from datetime import date, datetime, timedelta
+import re
+
 from bs4 import BeautifulSoup
 from urllib.parse import urlparse, urlunparse
 
@@ -194,6 +197,215 @@ def parse_job_poster(soup: BeautifulSoup) -> tuple[str | None, str | None]:
 
     except Exception:
         return (None, None)
+
+
+def parse_applicants_count(soup: BeautifulSoup) -> int | None:
+    """
+    Gets the number of applicants from job detail page
+    :param soup: BeautifulSoup object of the job page
+    :return: integer count of applicants or None
+    """
+    try:
+        # Pattern to match "X applicants", "Over X applicants", "X+ applicants", etc.
+        applicant_patterns = [
+            re.compile(r"(\d+)\s*applicants?", re.IGNORECASE),
+            re.compile(r"over\s+(\d+)\s*applicants?", re.IGNORECASE),
+            re.compile(r"(\d+)\+\s*applicants?", re.IGNORECASE),
+            re.compile(r"(\d+)\s*people?\s+applied", re.IGNORECASE),
+        ]
+
+        # Search for elements containing "applicant" text
+        search_elements = soup.find_all(
+            ["span", "div", "p", "strong", "b"],
+            string=lambda text: text and re.search(r"applicant", text, re.IGNORECASE)
+        )
+
+        for element in search_elements:
+            text = element.get_text(strip=True)
+            for pattern in applicant_patterns:
+                match = pattern.search(text)
+                if match:
+                    try:
+                        count = int(match.group(1))
+                        return count
+                    except (ValueError, IndexError):
+                        continue
+
+        # Also search in parent elements that might contain the applicant info
+        # Look for common LinkedIn classes that might contain applicant info
+        applicant_classes = [
+            "num-applicants",
+            "applicants-count",
+            "job-details-jobs-unified-top-card__applicant-count",
+            "jobs-unified-top-card__applicant-count",
+        ]
+
+        for class_name in applicant_classes:
+            applicant_elem = soup.find(class_=lambda x: x and class_name in str(x).lower())
+            if applicant_elem:
+                text = applicant_elem.get_text(strip=True)
+                for pattern in applicant_patterns:
+                    match = pattern.search(text)
+                    if match:
+                        try:
+                            count = int(match.group(1))
+                            return count
+                        except (ValueError, IndexError):
+                            continue
+
+        # Search more broadly in the top section of the job page
+        # LinkedIn often shows applicant count near the top
+        top_section = soup.find(["header", "section", "div"], class_=lambda x: x and ("top-card" in str(x).lower() or "job-header" in str(x).lower()))
+        if top_section:
+            text = top_section.get_text()
+            for pattern in applicant_patterns:
+                match = pattern.search(text)
+                if match:
+                    try:
+                        count = int(match.group(1))
+                        return count
+                    except (ValueError, IndexError):
+                        continue
+
+    except Exception:
+        pass
+
+    return None
+
+
+def parse_date_posted(soup: BeautifulSoup) -> date | None:
+    """
+    Gets the job posted date from job detail page
+    :param soup: BeautifulSoup object of the job page
+    :return: date object or None
+    """
+    try:
+        # First, try to find the specific LinkedIn class for posted date
+        # The class can be: "posted-time-ago__text posted-time-ago__text--new topcard__flavor--metadata"
+        posted_time_classes = [
+            "posted-time-ago__text",
+            "topcard__flavor--metadata",
+        ]
+        
+        # Look for elements with these classes (can be in class list)
+        # Also check for <time> elements which often have datetime attributes
+        date_elem = soup.find("time", class_=lambda x: x and any(cls in str(x) for cls in posted_time_classes))
+        if not date_elem:
+            # Try finding by any of the classes
+            for class_name in posted_time_classes:
+                date_elem = soup.find(class_=lambda x: x and class_name in str(x))
+                if date_elem:
+                    break
+        
+        if date_elem:
+            text = date_elem.get_text(strip=True)
+            # Try to parse relative time like "2 days ago", "1 week ago", etc.
+            posted_patterns = [
+                re.compile(r"(\d+)\s+(day|days|week|weeks|month|months|hour|hours)\s+ago", re.IGNORECASE),
+                re.compile(r"posted\s+(\d+)\s+(day|days|week|weeks|month|months|hour|hours)\s+ago", re.IGNORECASE),
+                re.compile(r"reposted\s+(\d+)\s+(day|days|week|weeks|month|months|hour|hours)\s+ago", re.IGNORECASE),
+            ]
+            for pattern in posted_patterns:
+                match = pattern.search(text.lower())
+                if match:
+                    amount = int(match.group(1))
+                    unit = match.group(2).lower()
+                    today = date.today()
+                    if "hour" in unit:
+                        return today
+                    elif "day" in unit:
+                        return today - timedelta(days=amount)
+                    elif "week" in unit:
+                        return today - timedelta(weeks=amount)
+                    elif "month" in unit:
+                        return today - timedelta(days=amount * 30)
+            # If we found the element but couldn't parse, try to look for datetime attribute
+            if date_elem.get("datetime"):
+                try:
+                    datetime_str = date_elem["datetime"]
+                    dt = datetime.fromisoformat(datetime_str.replace("Z", "+00:00"))
+                    return dt.date()
+                except (ValueError, AttributeError):
+                    try:
+                        return datetime.strptime(datetime_str, "%Y-%m-%d").date()
+                    except (ValueError, AttributeError):
+                        pass
+
+        # Look for spans or divs containing "Posted" or "Reposted" text
+        posted_patterns = [
+            re.compile(r"posted\s+(\d+)\s+(day|days|week|weeks|month|months|hour|hours)\s+ago", re.IGNORECASE),
+            re.compile(r"reposted\s+(\d+)\s+(day|days|week|weeks|month|months|hour|hours)\s+ago", re.IGNORECASE),
+        ]
+
+        # Search in common LinkedIn job page sections for elements containing "Posted" or "Reposted"
+        search_elements = soup.find_all(["span", "div", "p"], string=lambda text: text and re.search(r"(posted|reposted)", text, re.IGNORECASE))
+        
+        for element in search_elements:
+            text = element.get_text(strip=True).lower()
+            for pattern in posted_patterns:
+                match = pattern.search(text)
+                if match:
+                    amount = int(match.group(1))
+                    unit = match.group(2).lower()
+                    
+                    # Calculate the date based on the relative time
+                    today = date.today()
+                    if "hour" in unit:
+                        # For hours, we'll use today's date (too granular for date field)
+                        return today
+                    elif "day" in unit:
+                        return today - timedelta(days=amount)
+                    elif "week" in unit:
+                        return today - timedelta(weeks=amount)
+                    elif "month" in unit:
+                        # Approximate months as 30 days
+                        return today - timedelta(days=amount * 30)
+
+        # Look for text containing date patterns like "Posted on [date]"
+        date_pattern = re.compile(r"(posted|reposted)\s+(?:on\s+)?(\d{1,2}[/-]\d{1,2}[/-]\d{2,4})", re.IGNORECASE)
+        # Search more broadly for date patterns
+        all_text_elements = soup.find_all(["span", "div", "p"])
+        for element in all_text_elements:
+            text = element.get_text(strip=True)
+            match = date_pattern.search(text)
+            if match:
+                date_str = match.group(2)
+                # Try common date formats
+                for fmt in ["%m/%d/%Y", "%m-%d-%Y", "%d/%m/%Y", "%d-%m-%Y", "%Y-%m-%d"]:
+                    try:
+                        return datetime.strptime(date_str, fmt).date()
+                    except ValueError:
+                        continue
+
+        # Look for elements with classes that might contain date info
+        date_classes = [
+            "posted-date",
+            "job-posted-date",
+            "posted-time",
+            "t-black--light",
+        ]
+        for class_name in date_classes:
+            date_elem = soup.find(class_=lambda x: x and class_name in str(x).lower())
+            if date_elem:
+                text = date_elem.get_text(strip=True)
+                # Try to extract date from text
+                for pattern in posted_patterns:
+                    match = pattern.search(text.lower())
+                    if match:
+                        amount = int(match.group(1))
+                        unit = match.group(2).lower()
+                        today = date.today()
+                        if "day" in unit:
+                            return today - timedelta(days=amount)
+                        elif "week" in unit:
+                            return today - timedelta(weeks=amount)
+                        elif "month" in unit:
+                            return today - timedelta(days=amount * 30)
+
+    except Exception:
+        pass
+
+    return None
 
 
 def is_job_remote(title: dict, description: str, location: Location) -> bool:

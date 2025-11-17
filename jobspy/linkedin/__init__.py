@@ -22,6 +22,8 @@ from jobspy.linkedin.util import (
     parse_company_headquarters,
     parse_company_employees_count,
     parse_job_poster,
+    parse_date_posted,
+    parse_applicants_count,
 )
 from jobspy.model import (
     JobPost,
@@ -213,17 +215,19 @@ class LinkedIn(Scraper):
             if metadata_card
             else None
         )
-        date_posted = None
+        date_posted_listing = None
         if datetime_tag and "datetime" in datetime_tag.attrs:
             datetime_str = datetime_tag["datetime"]
             try:
-                date_posted = datetime.strptime(datetime_str, "%Y-%m-%d")
+                date_posted_listing = datetime.strptime(datetime_str, "%Y-%m-%d").date()
             except:
-                date_posted = None
+                date_posted_listing = None
         job_details = {}
         if full_descr:
             job_details = self._get_job_details(job_id)
             description = job_details.get("description")
+        # Use date from detail page if available, otherwise fall back to listing page date
+        date_posted = job_details.get("date_posted") or date_posted_listing
         is_remote = is_job_remote(title, description, location)
 
         return JobPost(
@@ -248,6 +252,7 @@ class LinkedIn(Scraper):
             company_employees_count=job_details.get("company_employees_count"),
             job_poster_name=job_details.get("job_poster_name"),
             job_poster_profile_url=job_details.get("job_poster_profile_url"),
+            applicants_count=job_details.get("applicants_count"),
         )
 
     def _get_job_details(self, job_id: str) -> dict:
@@ -298,6 +303,8 @@ class LinkedIn(Scraper):
         company_headquarters = parse_company_headquarters(soup)
         company_employees_count = parse_company_employees_count(soup)
         job_poster_name, job_poster_profile_url = parse_job_poster(soup)
+        date_posted = parse_date_posted(soup)
+        applicants_count = parse_applicants_count(soup)
         return {
             "description": description,
             "job_level": parse_job_level(soup),
@@ -310,6 +317,8 @@ class LinkedIn(Scraper):
             "company_employees_count": company_employees_count,
             "job_poster_name": job_poster_name,
             "job_poster_profile_url": job_poster_profile_url,
+            "date_posted": date_posted,
+            "applicants_count": applicants_count,
         }
 
     def _get_location(self, metadata_card: Optional[Tag]) -> Location:

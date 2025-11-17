@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -44,7 +44,35 @@ export default function JobFiltersComponent({
 }: JobFiltersComponentProps) {
   const [technologyInput, setTechnologyInput] = useState("");
   const [skillInput, setSkillInput] = useState("");
-  const [isExpanded, setIsExpanded] = useState(false);
+  
+  // Calculate active filter count
+  const activeFilterCount = [
+    filters.job_categories?.length ?? 0,
+    filters.technologies?.length ?? 0,
+    filters.required_skills?.length ?? 0,
+    filters.work_arrangement ? 1 : 0,
+    filters.min_years_experience !== undefined ? 1 : 0,
+    filters.independent_contractor_friendly !== undefined ? 1 : 0,
+    filters.has_own_products !== undefined ? 1 : 0,
+    filters.is_recruiting_company !== undefined ? 1 : 0,
+    filters.min_employee_size !== undefined ? 1 : 0,
+    // Don't count max_employee_size when it's 111 (the default)
+    filters.max_employee_size !== undefined && filters.max_employee_size !== 111 ? 1 : 0,
+    filters.min_applicants_count !== undefined ? 1 : 0,
+    filters.max_applicants_count !== undefined ? 1 : 0,
+    filters.date_posted_from ? 1 : 0,
+    filters.date_posted_to ? 1 : 0,
+  ].reduce((sum: number, count: number) => sum + count, 0);
+  
+  // Auto-expand when filters are active, or keep expanded state when user is interacting
+  const [isExpanded, setIsExpanded] = useState(activeFilterCount > 0);
+  
+  // Keep expanded when filters become active
+  useEffect(() => {
+    if (activeFilterCount > 0) {
+      setIsExpanded(true);
+    }
+  }, [activeFilterCount]);
 
   const handleCategoryToggle = (category: string) => {
     const current = filters.job_categories || [];
@@ -93,20 +121,6 @@ export default function JobFiltersComponent({
       required_skills: current.filter((s) => s !== skill),
     });
   };
-
-  const activeFilterCount = [
-    filters.job_categories?.length ?? 0,
-    filters.technologies?.length ?? 0,
-    filters.required_skills?.length ?? 0,
-    filters.work_arrangement ? 1 : 0,
-    filters.min_years_experience !== undefined ? 1 : 0,
-    filters.independent_contractor_friendly !== undefined ? 1 : 0,
-    filters.has_own_products !== undefined ? 1 : 0,
-    filters.is_recruiting_company !== undefined ? 1 : 0,
-    filters.min_employee_size !== undefined ? 1 : 0,
-    // Don't count max_employee_size when it's 111 (the default)
-    filters.max_employee_size !== undefined && filters.max_employee_size !== 111 ? 1 : 0,
-  ].reduce((sum: number, count: number) => sum + count, 0);
 
   return (
     <div className="rounded-lg border bg-card p-4 mb-6">
@@ -296,6 +310,166 @@ export default function JobFiltersComponent({
                   <X className="h-4 w-4" />
                 </Button>
               )}
+            </div>
+          </div>
+
+          {/* Applicants Count */}
+          <div>
+            <Label className="text-sm font-medium mb-2 block">
+              Number of Applicants
+            </Label>
+            <div className="space-y-3">
+              <div>
+                <Label className="text-xs text-muted-foreground mb-1 block">
+                  Minimum:{" "}
+                  {filters.min_applicants_count !== undefined
+                    ? filters.min_applicants_count.toLocaleString()
+                    : "Any"}
+                </Label>
+                <div className="flex items-center gap-4">
+                  <Slider
+                    value={[filters.min_applicants_count || 0]}
+                    onValueChange={([value]: number[]) => {
+                      setIsExpanded(true);
+                      onFiltersChange({
+                        ...filters,
+                        min_applicants_count: value === 0 ? undefined : value,
+                      });
+                    }}
+                    min={0}
+                    max={1000}
+                    step={10}
+                    className="flex-1"
+                  />
+                  {filters.min_applicants_count !== undefined && (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() =>
+                        onFiltersChange({
+                          ...filters,
+                          min_applicants_count: undefined,
+                        })
+                      }
+                    >
+                      <X className="h-4 w-4" />
+                    </Button>
+                  )}
+                </div>
+              </div>
+              <div>
+                <Label className="text-xs text-muted-foreground mb-1 block">
+                  Maximum:{" "}
+                  {filters.max_applicants_count !== undefined
+                    ? filters.max_applicants_count.toLocaleString()
+                    : "Any"}
+                </Label>
+                <div className="flex items-center gap-4">
+                  <Slider
+                    value={[filters.max_applicants_count || 1000]}
+                    onValueChange={([value]: number[]) => {
+                      setIsExpanded(true);
+                      onFiltersChange({
+                        ...filters,
+                        max_applicants_count: value === 1000 ? undefined : value,
+                      });
+                    }}
+                    min={0}
+                    max={1000}
+                    step={10}
+                    className="flex-1"
+                  />
+                  {filters.max_applicants_count !== undefined && (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() =>
+                        onFiltersChange({
+                          ...filters,
+                          max_applicants_count: undefined,
+                        })
+                      }
+                    >
+                      <X className="h-4 w-4" />
+                    </Button>
+                  )}
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Date Posted */}
+          <div>
+            <Label className="text-sm font-medium mb-2 block">
+              Date Posted
+            </Label>
+            <div className="space-y-3">
+              <div>
+                <Label className="text-xs text-muted-foreground mb-1 block">
+                  From Date
+                </Label>
+                <div className="flex items-center gap-2">
+                  <Input
+                    type="date"
+                    value={filters.date_posted_from || ""}
+                    onChange={(e) =>
+                      onFiltersChange({
+                        ...filters,
+                        date_posted_from: e.target.value || undefined,
+                      })
+                    }
+                    onFocus={() => setIsExpanded(true)}
+                    className="flex-1"
+                  />
+                  {filters.date_posted_from && (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() =>
+                        onFiltersChange({
+                          ...filters,
+                          date_posted_from: undefined,
+                        })
+                      }
+                    >
+                      <X className="h-4 w-4" />
+                    </Button>
+                  )}
+                </div>
+              </div>
+              <div>
+                <Label className="text-xs text-muted-foreground mb-1 block">
+                  To Date
+                </Label>
+                <div className="flex items-center gap-2">
+                  <Input
+                    type="date"
+                    value={filters.date_posted_to || ""}
+                    onChange={(e) =>
+                      onFiltersChange({
+                        ...filters,
+                        date_posted_to: e.target.value || undefined,
+                      })
+                    }
+                    onFocus={() => setIsExpanded(true)}
+                    className="flex-1"
+                  />
+                  {filters.date_posted_to && (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() =>
+                        onFiltersChange({
+                          ...filters,
+                          date_posted_to: undefined,
+                        })
+                      }
+                    >
+                      <X className="h-4 w-4" />
+                    </Button>
+                  )}
+                </div>
+              </div>
             </div>
           </div>
 

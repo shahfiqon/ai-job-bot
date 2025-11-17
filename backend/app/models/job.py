@@ -51,6 +51,7 @@ class Job(Base):
     company_industry = Column(String(255), nullable=True)
     company_headquarters = Column(String(255), nullable=True)
     company_employees_count = Column(String(128), nullable=True)
+    applicants_count = Column(Integer, nullable=True)
     emails = Column(JSONB, nullable=True)
     
     # LLM-parsed fields from job description

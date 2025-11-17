@@ -93,7 +93,6 @@ def scrape(
                     location=location,
                     results_wanted=results_wanted,
                     linkedin_fetch_description=True,
-                    country_indeed="USA",
                     is_remote=True,
                     hours_old=3,
                 )

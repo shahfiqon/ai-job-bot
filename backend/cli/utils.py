@@ -159,6 +159,7 @@ def map_dataframe_row_to_job(
         "company_industry": _safe_str(row.get("company_industry")),
         "company_headquarters": _safe_str(row.get("company_headquarters")),
         "company_employees_count": _safe_str(row.get("company_employees_count")),
+        "applicants_count": _safe_int(row.get("applicants_count")),
         "emails": emails,
     }
 
@@ -296,6 +297,20 @@ def _safe_bool(value: Any) -> bool | None:
             return False
     try:
         return bool(int(value))
+    except (TypeError, ValueError):
+        return None
+
+
+def _safe_int(value: Any) -> int | None:
+    if value in (None, "", "None"):
+        return None
+    try:
+        if pd.isna(value):
+            return None
+    except Exception:
+        pass
+    try:
+        return int(value)
     except (TypeError, ValueError):
         return None
 

@@ -29,6 +29,7 @@ import {
   formatCompanySize,
   formatCurrency,
   formatDateRelative,
+  formatDateAbsolute,
   truncateText,
 } from "@/lib/utils"
 import type { Company, Job, JobDetail } from "@/types/job"
@@ -161,7 +162,11 @@ export default async function JobDetailPage({ params }: JobPageProps) {
 
   const location = buildLocation(job)
   const compensation = getCompensationDisplay(job)
-  const posted = job.date_posted ? formatDateRelative(job.date_posted) : "Not specified"
+  const postedRelative = job.date_posted ? formatDateRelative(job.date_posted) : null
+  const postedAbsolute = job.date_posted ? formatDateAbsolute(job.date_posted) : null
+  const posted = postedRelative && postedAbsolute 
+    ? `${postedRelative} (${postedAbsolute})` 
+    : postedRelative || postedAbsolute || "Not specified"
 
   return (
     <PageLayout>
@@ -287,7 +292,17 @@ export default async function JobDetailPage({ params }: JobPageProps) {
 
         <Card>
           <CardHeader>
-            <CardTitle>Job Description</CardTitle>
+            <div className="flex items-center justify-between">
+              <CardTitle>Job Description</CardTitle>
+              {job.job_url ? (
+                <Button asChild variant="outline" size="sm">
+                  <Link href={job.job_url} target="_blank" rel="noreferrer">
+                    <ExternalLink className="h-4 w-4 mr-2" />
+                    Open in new tab
+                  </Link>
+                </Button>
+              ) : null}
+            </div>
           </CardHeader>
           <CardContent>
             <div className="prose prose-slate max-w-none prose-job-description whitespace-pre-wrap">

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import math
+from datetime import date
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import and_, func, or_
@@ -70,6 +71,24 @@ def list_jobs(
         ge=0,
         description="Maximum company employee size (from company_size_on_linkedin, company_size_min, or company_size_max)",
     ),
+    min_applicants_count: int | None = Query(
+        default=None,
+        ge=0,
+        description="Minimum number of applicants",
+    ),
+    max_applicants_count: int | None = Query(
+        default=None,
+        ge=0,
+        description="Maximum number of applicants",
+    ),
+    date_posted_from: date | None = Query(
+        default=None,
+        description="Filter jobs posted on or after this date (YYYY-MM-DD)",
+    ),
+    date_posted_to: date | None = Query(
+        default=None,
+        description="Filter jobs posted on or before this date (YYYY-MM-DD)",
+    ),
     db: Session = Depends(get_db),
 ) -> JobListResponse:
     """Return a paginated list of jobs ordered by most recent posting with optional filters."""
@@ -115,6 +134,18 @@ def list_jobs(
         
         if independent_contractor_friendly is not None:
             filters.append(Job.independent_contractor_friendly == independent_contractor_friendly)
+        
+        # Applicants count filters
+        if min_applicants_count is not None:
+            filters.append(Job.applicants_count >= min_applicants_count)
+        if max_applicants_count is not None:
+            filters.append(Job.applicants_count <= max_applicants_count)
+        
+        # Date posted filters
+        if date_posted_from is not None:
+            filters.append(Job.date_posted >= date_posted_from)
+        if date_posted_to is not None:
+            filters.append(Job.date_posted <= date_posted_to)
         
         # Company filters - need to join with Company table
         company_filters_needed = (
