@@ -41,6 +41,10 @@ export interface Job {
   company_industry: string | null;
   company_headquarters: string | null;
   company_employees_count: string | null;
+  // Company employee size fields (from Company model)
+  company_size_min: number | null;
+  company_size_max: number | null;
+  company_size_on_linkedin: number | null;
   emails: string[] | null;
   
   // LLM-parsed fields from job description

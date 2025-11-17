@@ -103,6 +103,8 @@ export default function JobFiltersComponent({
     filters.independent_contractor_friendly !== undefined ? 1 : 0,
     filters.has_own_products !== undefined ? 1 : 0,
     filters.is_recruiting_company !== undefined ? 1 : 0,
+    filters.min_employee_size !== undefined ? 1 : 0,
+    filters.max_employee_size !== undefined ? 1 : 0,
   ].reduce((sum: number, count: number) => sum + count, 0);
 
   return (
@@ -293,6 +295,87 @@ export default function JobFiltersComponent({
                   <X className="h-4 w-4" />
                 </Button>
               )}
+            </div>
+          </div>
+
+          {/* Employee Size */}
+          <div>
+            <Label className="text-sm font-medium mb-2 block">
+              Company Employee Size
+            </Label>
+            <div className="space-y-3">
+              <div>
+                <Label className="text-xs text-muted-foreground mb-1 block">
+                  Minimum:{" "}
+                  {filters.min_employee_size !== undefined
+                    ? filters.min_employee_size.toLocaleString()
+                    : "Any"}
+                </Label>
+                <div className="flex items-center gap-4">
+                  <Slider
+                    value={[filters.min_employee_size || 0]}
+                    onValueChange={([value]: number[]) =>
+                      onFiltersChange({
+                        ...filters,
+                        min_employee_size: value === 0 ? undefined : value,
+                      })
+                    }
+                    max={100000}
+                    step={100}
+                    className="flex-1"
+                  />
+                  {filters.min_employee_size !== undefined && (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() =>
+                        onFiltersChange({
+                          ...filters,
+                          min_employee_size: undefined,
+                        })
+                      }
+                    >
+                      <X className="h-4 w-4" />
+                    </Button>
+                  )}
+                </div>
+              </div>
+              <div>
+                <Label className="text-xs text-muted-foreground mb-1 block">
+                  Maximum:{" "}
+                  {filters.max_employee_size !== undefined
+                    ? filters.max_employee_size.toLocaleString()
+                    : "Any"}
+                </Label>
+                <div className="flex items-center gap-4">
+                  <Slider
+                    value={[filters.max_employee_size || 100000]}
+                    onValueChange={([value]: number[]) =>
+                      onFiltersChange({
+                        ...filters,
+                        max_employee_size: value === 100000 ? undefined : value,
+                      })
+                    }
+                    max={100000}
+                    step={100}
+                    className="flex-1"
+                  />
+                  {filters.max_employee_size !== undefined && (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() =>
+                        onFiltersChange({
+                          ...filters,
+                          max_employee_size: undefined,
+                        })
+                      }
+                    >
+                      <X className="h-4 w-4" />
+                    </Button>
+                  )}
+                </div>
+              </div>
             </div>
           </div>
 

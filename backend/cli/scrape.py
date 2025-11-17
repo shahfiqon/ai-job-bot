@@ -66,6 +66,10 @@ def scrape(
 
     session = SessionLocal()
     jobs_df: pd.DataFrame | None = None
+    original_jobs_count = 0
+    jobs_filtered = 0
+    original_companies_count = 0
+    companies_filtered = 0
 
     try:
         progress = Progress(
@@ -104,8 +108,9 @@ def scrape(
                 console.print("[yellow]No jobs found for the given criteria.[/]")
                 raise typer.Exit(code=0)
 
+            original_jobs_count = len(jobs_df)
             console.print(
-                f"[green]Scraped {len(jobs_df)} jobs with "
+                f"[green]Scraped {original_jobs_count} jobs with "
                 f"{len(jobs_df.columns)} fields.[/]"
             )
             preview_columns = [
@@ -116,9 +121,32 @@ def scrape(
             if preview_columns:
                 console.print(jobs_df[preview_columns].head().to_string(index=False))
 
-            linkedin_urls = _extract_unique_linkedin_urls(jobs_df)
+            # Filter out existing jobs from database
+            filter_task = progress.add_task(
+                "[bold]Filtering existing jobs...[/bold]",
+                total=1,
+            )
+            jobs_df, jobs_filtered = _filter_existing_jobs(session, jobs_df)
+            progress.update(filter_task, completed=1)
+            
+            if jobs_filtered > 0:
+                console.print(
+                    f"[yellow]Filtered out {jobs_filtered} existing jobs from database.[/]"
+                )
+            
+            if jobs_df.empty:
+                console.print("[yellow]No new jobs to process after filtering.[/]")
+                raise typer.Exit(code=0)
+
             console.print(
-                f"[bold cyan]Found {len(linkedin_urls)} LinkedIn company URLs.[/]"
+                f"[green]Processing {len(jobs_df)} new jobs.[/]"
+            )
+
+            # Extract company URLs from filtered (new) jobs only
+            linkedin_urls = _extract_unique_linkedin_urls(jobs_df)
+            original_companies_count = len(linkedin_urls)
+            console.print(
+                f"[bold cyan]Found {original_companies_count} LinkedIn company URLs from new jobs.[/]"
             )
 
             if not settings.PROXYCURL_API_KEY:
@@ -128,11 +156,30 @@ def scrape(
                 )
                 raise typer.Exit(code=1)
 
+            # Filter out existing companies from database
+            company_filter_task = progress.add_task(
+                "[bold]Filtering existing companies...[/bold]",
+                total=1,
+            )
+            linkedin_urls, companies_filtered = _filter_existing_companies(session, linkedin_urls)
+            progress.update(company_filter_task, completed=1)
+            
+            if companies_filtered > 0:
+                console.print(
+                    f"[yellow]Filtered out {companies_filtered} existing companies from database.[/]"
+                )
+            
+            if linkedin_urls:
+                console.print(
+                    f"[green]Processing {len(linkedin_urls)} new companies.[/]"
+                )
+
             company_cache: dict[str, int] = {}
             company_stats = {
                 "created": 0,
                 "cached": 0,
                 "failed": 0,
+                "filtered": companies_filtered,
             }
 
             if linkedin_urls:
@@ -215,10 +262,12 @@ def scrape(
             session.commit()
 
         _show_summary(
-            total_jobs=len(jobs_df),
+            total_jobs=original_jobs_count,
+            jobs_filtered=jobs_filtered,
             job_created=job_stats["created"],
             job_skipped=job_stats["skipped"],
-            companies_found=len(linkedin_urls),
+            companies_found=original_companies_count,
+            companies_filtered=companies_filtered,
             company_created=company_stats["created"],
             company_cached=company_stats["cached"],
             company_failed=company_stats["failed"],
@@ -232,6 +281,56 @@ def scrape(
         raise typer.Exit(code=1) from exc
     finally:
         session.close()
+
+
+def _filter_existing_jobs(
+    session,
+    jobs_df: pd.DataFrame,
+) -> tuple[pd.DataFrame, int]:
+    """Filter out jobs that already exist in the database by job_url.
+    
+    Returns:
+        Tuple of (filtered DataFrame, count of filtered jobs)
+    """
+    if jobs_df.empty or "job_url" not in jobs_df.columns:
+        return jobs_df, 0
+    
+    job_urls = jobs_df["job_url"].dropna().unique().tolist()
+    if not job_urls:
+        return jobs_df, 0
+    
+    existing_urls = {
+        url for url, in session.query(Job.job_url).filter(Job.job_url.in_(job_urls)).all()
+    }
+    
+    filtered_df = jobs_df[~jobs_df["job_url"].isin(existing_urls)].copy()
+    filtered_count = len(jobs_df) - len(filtered_df)
+    
+    return filtered_df, filtered_count
+
+
+def _filter_existing_companies(
+    session,
+    linkedin_urls: list[str],
+) -> tuple[list[str], int]:
+    """Filter out companies that already exist in the database by linkedin_url.
+    
+    Returns:
+        Tuple of (filtered list of LinkedIn URLs, count of filtered companies)
+    """
+    if not linkedin_urls:
+        return [], 0
+    
+    existing_urls = {
+        url for url, in session.query(Company.linkedin_url)
+        .filter(Company.linkedin_url.in_(linkedin_urls))
+        .all()
+    }
+    
+    filtered_urls = [url for url in linkedin_urls if url not in existing_urls]
+    filtered_count = len(linkedin_urls) - len(filtered_urls)
+    
+    return filtered_urls, filtered_count
 
 
 def _extract_unique_linkedin_urls(df: pd.DataFrame) -> list[str]:
@@ -256,15 +355,23 @@ def _ensure_company(
     company_cache: dict[str, int],
     company_stats: dict[str, int],
 ) -> int | None:
+    """Create or retrieve company by LinkedIn URL.
+    
+    Note: Companies are pre-filtered before calling this function,
+    so we should only be processing new companies. However, we keep
+    a safety check in case of race conditions.
+    """
     if linkedin_url in company_cache:
         company_stats["cached"] += 1
         return company_cache[linkedin_url]
 
+    # Safety check: in case of race conditions or if filtering was skipped
     existing = (
         session.query(Company).filter(Company.linkedin_url == linkedin_url).first()
     )
     if existing:
         company_stats["cached"] += 1
+        company_cache[linkedin_url] = existing.id
         return existing.id
 
     company_data = fetch_company_from_proxycurl(linkedin_url)
@@ -278,6 +385,7 @@ def _ensure_company(
             session.add(company)
             session.flush()
         company_stats["created"] += 1
+        company_cache[linkedin_url] = company.id
         return company.id
     except SQLAlchemyError as exc:
         company_stats["failed"] += 1
@@ -296,10 +404,17 @@ def _persist_job(
     job_stats: dict[str, int],
     structured_data=None,
 ) -> Job | None:
+    """Persist a job to the database.
+    
+    Note: Jobs are pre-filtered before calling this function,
+    so we should only be processing new jobs. However, we keep
+    a safety check in case of race conditions.
+    """
     job_url = row.get("job_url")
     if not job_url:
         return None
 
+    # Safety check: in case of race conditions or if filtering was skipped
     existing = session.query(Job.id).filter(Job.job_url == job_url).first()
     if existing:
         job_stats["skipped"] += 1
@@ -337,9 +452,11 @@ def _persist_job(
 def _show_summary(
     *,
     total_jobs: int,
+    jobs_filtered: int,
     job_created: int,
     job_skipped: int,
     companies_found: int,
+    companies_filtered: int,
     company_created: int,
     company_cached: int,
     company_failed: int,
@@ -349,9 +466,11 @@ def _show_summary(
     table.add_column("Count", justify="right", style="green")
 
     table.add_row("Jobs Scraped", str(total_jobs))
+    table.add_row("Jobs Filtered (existing)", str(jobs_filtered))
     table.add_row("Jobs Created", str(job_created))
     table.add_row("Jobs Skipped (duplicates)", str(job_skipped))
     table.add_row("Companies Found", str(companies_found))
+    table.add_row("Companies Filtered (existing)", str(companies_filtered))
     table.add_row("Companies Created", str(company_created))
     table.add_row("Companies Cached", str(company_cached))
     table.add_row("Companies Failed", str(company_failed))

@@ -34,6 +34,10 @@ class JobBaseResponse(BaseModel):
     company_industry: str | None = None
     company_headquarters: str | None = None
     company_employees_count: str | None = None
+    # Company employee size fields (from Company model)
+    company_size_min: int | None = None
+    company_size_max: int | None = None
+    company_size_on_linkedin: int | None = None
     emails: list[str] | None = None
     
     # LLM-parsed fields from job description

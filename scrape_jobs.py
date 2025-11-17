@@ -20,7 +20,7 @@ def main():
     # Hardcoded search parameters
     search_term = "software engineer"
     location = "San Francisco, CA"
-    results_wanted = 5
+    results_wanted = 1
     
     print(f"Search Term: {search_term}")
     print(f"Location: {location}")

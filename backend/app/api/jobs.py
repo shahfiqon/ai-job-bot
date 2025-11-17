@@ -60,6 +60,16 @@ def list_jobs(
         default=None,
         description="Filter by whether the company is a recruiting company",
     ),
+    min_employee_size: int | None = Query(
+        default=None,
+        ge=0,
+        description="Minimum company employee size (from company_size_on_linkedin, company_size_min, or company_size_max)",
+    ),
+    max_employee_size: int | None = Query(
+        default=None,
+        ge=0,
+        description="Maximum company employee size (from company_size_on_linkedin, company_size_min, or company_size_max)",
+    ),
     db: Session = Depends(get_db),
 ) -> JobListResponse:
     """Return a paginated list of jobs ordered by most recent posting with optional filters."""
@@ -107,12 +117,66 @@ def list_jobs(
             filters.append(Job.independent_contractor_friendly == independent_contractor_friendly)
         
         # Company filters - need to join with Company table
-        if has_own_products is not None or is_recruiting_company is not None:
+        company_filters_needed = (
+            has_own_products is not None
+            or is_recruiting_company is not None
+            or min_employee_size is not None
+            or max_employee_size is not None
+        )
+        
+        # Always join Company to get employee size data for display
+        # Use inner join if filtering by company fields, outer join otherwise
+        if company_filters_needed:
             query = query.join(Company, Job.company_id == Company.id)
             if has_own_products is not None:
                 filters.append(Company.has_own_products == has_own_products)
             if is_recruiting_company is not None:
                 filters.append(Company.is_recruiting_company == is_recruiting_company)
+            
+            # Employee size filtering - check against company_size_on_linkedin, company_size_min, or company_size_max
+            if min_employee_size is not None or max_employee_size is not None:
+                employee_size_filters = []
+                # Use company_size_on_linkedin as primary, fallback to company_size_min/max
+                # For filtering: check if company size overlaps with the requested range
+                if min_employee_size is not None:
+                    # Company size should be >= min_employee_size
+                    # Check: company_size_on_linkedin >= min OR (company_size_max >= min if company_size_on_linkedin is NULL)
+                    employee_size_filters.append(
+                        or_(
+                            Company.company_size_on_linkedin >= min_employee_size,
+                            and_(
+                                Company.company_size_on_linkedin.is_(None),
+                                Company.company_size_max >= min_employee_size,
+                            ),
+                            and_(
+                                Company.company_size_on_linkedin.is_(None),
+                                Company.company_size_max.is_(None),
+                                Company.company_size_min >= min_employee_size,
+                            ),
+                        )
+                    )
+                if max_employee_size is not None:
+                    # Company size should be <= max_employee_size
+                    # Check: company_size_on_linkedin <= max OR (company_size_min <= max if company_size_on_linkedin is NULL)
+                    employee_size_filters.append(
+                        or_(
+                            Company.company_size_on_linkedin <= max_employee_size,
+                            and_(
+                                Company.company_size_on_linkedin.is_(None),
+                                Company.company_size_min <= max_employee_size,
+                            ),
+                            and_(
+                                Company.company_size_on_linkedin.is_(None),
+                                Company.company_size_min.is_(None),
+                                Company.company_size_max <= max_employee_size,
+                            ),
+                        )
+                    )
+                if employee_size_filters:
+                    filters.append(and_(*employee_size_filters))
+        else:
+            # Outer join to include company data for display, but don't filter out jobs without companies
+            query = query.outerjoin(Company, Job.company_id == Company.id)
         
         # Apply all filters
         if filters:
@@ -122,9 +186,10 @@ def list_jobs(
         total = query.with_entities(func.count(Job.id)).scalar() or 0
         offset = (page - 1) * page_size
 
-        # Get paginated results
+        # Get paginated results - Company is already joined (inner or outer)
         jobs = (
             query
+            .options(joinedload(Job.company))
             .order_by(
                 Job.date_posted.desc().nulls_last(),
                 Job.created_at.desc(),
@@ -134,7 +199,15 @@ def list_jobs(
             .all()
         )
 
-        jobs_response = [JobListItemResponse.model_validate(job) for job in jobs]
+        # Map jobs to response, including company employee size fields
+        jobs_response = []
+        for job in jobs:
+            job_dict = JobListItemResponse.model_validate(job).model_dump()
+            if job.company:
+                job_dict["company_size_min"] = job.company.company_size_min
+                job_dict["company_size_max"] = job.company.company_size_max
+                job_dict["company_size_on_linkedin"] = job.company.company_size_on_linkedin
+            jobs_response.append(JobListItemResponse(**job_dict))
         total_pages = math.ceil(total / page_size) if total else 0
 
         return JobListResponse(

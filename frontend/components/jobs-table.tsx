@@ -100,6 +100,11 @@ const JobsTable = ({ jobs }: JobsTableProps) => {
                       Remote
                     </Badge>
                   ) : null}
+                  {formatEmployeeSize(job) && (
+                    <div className="text-xs text-muted-foreground">
+                      {formatEmployeeSize(job)}
+                    </div>
+                  )}
                 </div>
               </TableCell>
               <TableCell>
@@ -264,6 +269,40 @@ const getJobTypeBadgeVariant = (
     default:
       return "outline";
   }
+};
+
+const formatEmployeeSize = (job: Job): string | null => {
+  // Prefer company_size_on_linkedin, fallback to company_size_min/max
+  if (job.company_size_on_linkedin !== null && job.company_size_on_linkedin !== undefined) {
+    return formatNumber(job.company_size_on_linkedin) + " employees";
+  }
+  
+  if (job.company_size_min !== null && job.company_size_max !== null) {
+    if (job.company_size_min === job.company_size_max) {
+      return formatNumber(job.company_size_min) + " employees";
+    }
+    return `${formatNumber(job.company_size_min)}-${formatNumber(job.company_size_max)} employees`;
+  }
+  
+  if (job.company_size_min !== null) {
+    return `${formatNumber(job.company_size_min)}+ employees`;
+  }
+  
+  if (job.company_size_max !== null) {
+    return `Up to ${formatNumber(job.company_size_max)} employees`;
+  }
+  
+  return null;
+};
+
+const formatNumber = (num: number): string => {
+  if (num >= 1000000) {
+    return (num / 1000000).toFixed(1).replace(/\.0$/, "") + "M";
+  }
+  if (num >= 1000) {
+    return (num / 1000).toFixed(1).replace(/\.0$/, "") + "k";
+  }
+  return num.toLocaleString();
 };
 
 export default JobsTable;
