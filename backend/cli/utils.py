@@ -76,14 +76,11 @@ def fetch_company_from_proxycurl(
                 logger.warning("Proxycurl could not find company for %s", linkedin_url)
                 return None
             logger.error(
-                "Proxycurl HTTP error (%s) while enriching %s: %s",
-                status_code,
-                linkedin_url,
-                exc,
+                f"Proxycurl HTTP error ({status_code}) while enriching {linkedin_url}: {exc}",
             )
             return None
         except requests.RequestException as exc:
-            logger.error("Proxycurl request failure for %s: %s", linkedin_url, exc)
+            logger.error(f"Proxycurl request failure for {linkedin_url}: {exc}")
             return None
 
     return None
@@ -134,6 +131,27 @@ def map_dataframe_row_to_job(
     job_types = _split_to_list(row.get("job_type"))
     emails = _split_to_list(row.get("emails"))
 
+    # Safely get date_posted and applicants_count, handling missing columns and NaN values
+    date_posted_value = None
+    if "date_posted" in row.index:
+        date_posted_value = row["date_posted"]
+        if pd.isna(date_posted_value):
+            date_posted_value = None
+        else:
+            logger.debug(f"Found date_posted value: {date_posted_value} (type: {type(date_posted_value)})")
+    else:
+        logger.debug("date_posted column not found in row")
+    
+    applicants_count_value = None
+    if "applicants_count" in row.index:
+        applicants_count_value = row["applicants_count"]
+        if pd.isna(applicants_count_value):
+            applicants_count_value = None
+        else:
+            logger.debug(f"Found applicants_count value: {applicants_count_value} (type: {type(applicants_count_value)})")
+    else:
+        logger.debug("applicants_count column not found in row")
+
     job_kwargs = {
         "job_url": _safe_str(row.get("job_url")),
         "job_url_direct": _safe_str(row.get("job_url_direct")),
@@ -151,7 +169,7 @@ def map_dataframe_row_to_job(
         "compensation_currency": _safe_str(row.get("currency")),
         "compensation_interval": _safe_str(row.get("interval")),
         "job_type": job_types,
-        "date_posted": _coerce_date(row.get("date_posted")),
+        "date_posted": _coerce_date(date_posted_value),
         "is_remote": _safe_bool(row.get("is_remote")),
         "listing_type": _safe_str(row.get("listing_type")),
         "job_level": _safe_str(row.get("job_level")),
@@ -159,7 +177,7 @@ def map_dataframe_row_to_job(
         "company_industry": _safe_str(row.get("company_industry")),
         "company_headquarters": _safe_str(row.get("company_headquarters")),
         "company_employees_count": _safe_str(row.get("company_employees_count")),
-        "applicants_count": _safe_int(row.get("applicants_count")),
+        "applicants_count": _safe_int(applicants_count_value),
         "emails": emails,
     }
 
@@ -319,6 +337,9 @@ def _coerce_date(value: Any) -> date | None:
     if value in (None, "", "None"):
         return None
     try:
+        # Check for NaN/NaT before attempting conversion
+        if pd.isna(value):
+            return None
         parsed = pd.to_datetime(value)
     except Exception:
         return None

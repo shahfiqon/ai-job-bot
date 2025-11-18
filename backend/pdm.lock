@@ -5,7 +5,7 @@
 groups = ["default"]
 strategy = ["inherit_metadata"]
 lock_version = "4.5.0"
-content_hash = "sha256:360f7762063a94ffef27c22945a408f849bce2678bbf4760c11215f0b7b976af"
+content_hash = "sha256:4042601877bddaf29f7ab06f7537723b6cd0e315ead5154f94ccbd3d9cb409e8"
 
 [[metadata.targets]]
 requires_python = ">=3.10"
@@ -314,7 +314,7 @@ version = "0.4.6"
 requires_python = "!=3.0.*,!=3.1.*,!=3.2.*,!=3.3.*,!=3.4.*,!=3.5.*,!=3.6.*,>=2.7"
 summary = "Cross-platform colored terminal text."
 groups = ["default"]
-marker = "sys_platform == \"win32\" or platform_system == \"Windows\""
+marker = "platform_system == \"Windows\" or sys_platform == \"win32\""
 files = [
     {file = "colorama-0.4.6-py2.py3-none-any.whl", hash = "sha256:4f1d9991f5acc0ca119f9d443620b77f9d6b33703e51011c16baf57afb285fc6"},
     {file = "colorama-0.4.6.tar.gz", hash = "sha256:08695f5cb7ed6e0531a20572697297273c47b8cae5a63ffc6d6ed5c201be6e44"},
@@ -723,7 +723,7 @@ files = [
 
 [[package]]
 name = "markdownify"
-version = "0.13.1"
+version = "1.2.2"
 summary = "Convert HTML to markdown."
 groups = ["default"]
 dependencies = [
@@ -731,8 +731,8 @@ dependencies = [
     "six<2,>=1.15",
 ]
 files = [
-    {file = "markdownify-0.13.1-py3-none-any.whl", hash = "sha256:1d181d43d20902bcc69d7be85b5316ed174d0dda72ff56e14ae4c95a4a407d22"},
-    {file = "markdownify-0.13.1.tar.gz", hash = "sha256:ab257f9e6bd4075118828a28c9d02f8a4bfeb7421f558834aa79b2dfeb32a098"},
+    {file = "markdownify-1.2.2-py3-none-any.whl", hash = "sha256:3f02d3cc52714084d6e589f70397b6fc9f2f3a8531481bf35e8cc39f975e186a"},
+    {file = "markdownify-1.2.2.tar.gz", hash = "sha256:b274f1b5943180b031b699b199cbaeb1e2ac938b75851849a31fd0c3d6603d09"},
 ]
 
 [[package]]
@@ -890,6 +890,33 @@ files = [
     {file = "numpy-1.26.3-cp312-cp312-win32.whl", hash = "sha256:f73497e8c38295aaa4741bdfa4fda1a5aedda5473074369eca10626835445511"},
     {file = "numpy-1.26.3-cp312-cp312-win_amd64.whl", hash = "sha256:da4b0c6c699a0ad73c810736303f7fbae483bcb012e38d7eb06a5e3b432c981b"},
     {file = "numpy-1.26.3.tar.gz", hash = "sha256:697df43e2b6310ecc9d95f05d5ef20eacc09c7c4ecc9da3f235d39e71b7da1e4"},
+]
+
+[[package]]
+name = "nvidia-ml-py"
+version = "13.580.82"
+summary = "Python Bindings for the NVIDIA Management Library"
+groups = ["default"]
+files = [
+    {file = "nvidia_ml_py-13.580.82-py3-none-any.whl", hash = "sha256:4361db337b0c551e2d101936dae2e9a60f957af26818e8c0c3a1f32b8db8d0a7"},
+    {file = "nvidia_ml_py-13.580.82.tar.gz", hash = "sha256:0c028805dc53a0e2a6985ea801888197765ac2ef8f1c9e29a7bf0d3616a5efc7"},
+]
+
+[[package]]
+name = "nvitop"
+version = "1.6.0"
+requires_python = ">=3.8"
+summary = "An interactive NVIDIA-GPU process viewer and beyond, the one-stop solution for GPU process management."
+groups = ["default"]
+dependencies = [
+    "colorama>=0.4.0; platform_system == \"Windows\"",
+    "nvidia-ml-py<13.581.0a0,>=11.450.51",
+    "psutil>=5.6.6",
+    "windows-curses>=2.2.0; platform_system == \"Windows\"",
+]
+files = [
+    {file = "nvitop-1.6.0-py3-none-any.whl", hash = "sha256:6e0383cd6106a0ea6b4ffdbb50b53556ef9e1cc2e3d75943c741964c7596ec51"},
+    {file = "nvitop-1.6.0.tar.gz", hash = "sha256:f30c498e3837ea8e9debe4a980b35f6bceb6d38ef522a0591fadbf4ab0528cb2"},
 ]
 
 [[package]]
@@ -1338,27 +1365,6 @@ groups = ["default"]
 files = [
     {file = "python_dotenv-1.2.1-py3-none-any.whl", hash = "sha256:b81ee9561e9ca4004139c6cbba3a238c32b03e4894671e181b671e8cb8425d61"},
     {file = "python_dotenv-1.2.1.tar.gz", hash = "sha256:42667e897e16ab0d66954af0e60a9caa94f0fd4ecf3aaf6d2d260eec1aa36ad6"},
-]
-
-[[package]]
-name = "python-jobspy"
-version = "1.1.82"
-requires_python = "<4.0,>=3.10"
-summary = "Job scraper for LinkedIn, Indeed, Glassdoor, ZipRecruiter & Bayt"
-groups = ["default"]
-dependencies = [
-    "NUMPY==1.26.3",
-    "beautifulsoup4<5.0.0,>=4.12.2",
-    "markdownify<0.14.0,>=0.13.1",
-    "pandas<3.0.0,>=2.1.0",
-    "pydantic<3.0.0,>=2.3.0",
-    "regex<2025.0.0,>=2024.4.28",
-    "requests<3.0.0,>=2.31.0",
-    "tls-client<2.0.0,>=1.0.1",
-]
-files = [
-    {file = "python_jobspy-1.1.82-py3-none-any.whl", hash = "sha256:93d638b35ffd30a714253e065907f68c5bac624e3937a3ad2ba09f618a072ee9"},
-    {file = "python_jobspy-1.1.82.tar.gz", hash = "sha256:32efb486da5eb60dc54a574bb4a1fb66838fdee75699a7a601aae763637dc8ea"},
 ]
 
 [[package]]
@@ -2167,4 +2173,21 @@ marker = "sys_platform == \"win32\""
 files = [
     {file = "win32_setctime-1.2.0-py3-none-any.whl", hash = "sha256:95d644c4e708aba81dc3704a116d8cbc974d70b3bdb8be1d150e36be6e9d1390"},
     {file = "win32_setctime-1.2.0.tar.gz", hash = "sha256:ae1fdf948f5640aae05c511ade119313fb6a30d7eabe25fef9764dca5873c4c0"},
+]
+
+[[package]]
+name = "windows-curses"
+version = "2.4.1"
+summary = "Support for the standard curses module on Windows"
+groups = ["default"]
+marker = "platform_system == \"Windows\""
+files = [
+    {file = "windows_curses-2.4.1-cp310-cp310-win32.whl", hash = "sha256:53d711e07194d0d3ff7ceff29e0955b35479bc01465d46c3041de67b8141db2f"},
+    {file = "windows_curses-2.4.1-cp310-cp310-win_amd64.whl", hash = "sha256:325439cd4f37897a1de8a9c068a5b4c432f9244bf9c855ee2fbeb3fa721a770c"},
+    {file = "windows_curses-2.4.1-cp311-cp311-win32.whl", hash = "sha256:4fa1a176bfcf098d0c9bb7bc03dce6e83a4257fc0c66ad721f5745ebf0c00746"},
+    {file = "windows_curses-2.4.1-cp311-cp311-win_amd64.whl", hash = "sha256:fd7d7a9cf6c1758f46ed76b8c67f608bc5fcd5f0ca91f1580fd2d84cf41c7f4f"},
+    {file = "windows_curses-2.4.1-cp312-cp312-win32.whl", hash = "sha256:bdbe7d58747408aef8a9128b2654acf6fbd11c821b91224b9a046faba8c6b6ca"},
+    {file = "windows_curses-2.4.1-cp312-cp312-win_amd64.whl", hash = "sha256:5c9c2635faf171a229caca80e1dd760ab00db078e2a285ba2f667bbfcc31777c"},
+    {file = "windows_curses-2.4.1-cp313-cp313-win32.whl", hash = "sha256:05d1ca01e5199a435ccb6c8c2978df4a169cdff1ec99ab15f11ded9de8e5be26"},
+    {file = "windows_curses-2.4.1-cp313-cp313-win_amd64.whl", hash = "sha256:8cf653f8928af19c103ae11cfed38124f418dcdd92643c4cd17239c0cec2f9da"},
 ]

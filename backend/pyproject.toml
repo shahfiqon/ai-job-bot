@@ -12,18 +12,31 @@ dependencies = [
     "alembic",
     "typer",
     "rich",
-    "requests",
-    "python-jobspy>=1.1.79",
+    "requests<3.0.0,>=2.31.0",
     "pydantic-settings",
     "python-dotenv",
-    "pandas",
+    "pandas<3.0.0,>=2.1.0",
     "ipykernel>=7.1.0",
     "loguru",
     "ollama>=0.6.0",
+    "beautifulsoup4<5.0.0,>=4.12.2",
+    "NUMPY==1.26.3",
+    "pydantic<3.0.0,>=2.3.0",
+    "tls-client<2.0.0,>=1.0.1",
+    "markdownify<2.0.0,>=1.1.0",
+    "regex<2025.0.0,>=2024.4.28",
+    "nvitop>=1.6.0",
 ]
 
 [project.scripts]
 jobbot = "cli.main:app"
+
+[project.optional-dependencies]
+dev = [
+    "jupyter<2.0.0,>=1.0.0",
+    "black",
+    "pre-commit",
+]
 
 [build-system]
 requires = ["pdm-backend"]

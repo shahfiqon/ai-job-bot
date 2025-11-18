@@ -94,7 +94,7 @@ def scrape(
                     results_wanted=results_wanted,
                     linkedin_fetch_description=True,
                     is_remote=True,
-                    hours_old=3,
+                    hours_old=6,
                 )
             except Exception as exc:  # noqa: BLE001
                 logger.exception("Job scraping failed")
