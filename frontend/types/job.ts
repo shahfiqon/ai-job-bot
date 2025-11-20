@@ -15,6 +15,8 @@ export type JobLevel =
   | "Principal"
   | "Director";
 
+export type JobStatus = "saved" | "applied" | "interview" | "declined";
+
 export interface Job {
   id: number;
   job_url: string | null;
@@ -105,4 +107,29 @@ export interface Company {
 
 export interface JobDetail extends Job {
   company: Company | null;
+}
+
+export interface SavedJob {
+  id: number;
+  user_id: number;
+  job_id: number;
+  status: JobStatus;
+  notes: string | null;
+  created_at: Date;
+  updated_at: Date;
+  job: JobDetail;
+}
+
+export interface SavedJobListResponse {
+  saved_jobs: SavedJob[];
+  total: number;
+  page: number;
+  page_size: number;
+  total_pages: number;
+}
+
+export interface SavedJobCheckResponse {
+  is_saved: boolean;
+  saved_job_id: number | null;
+  status: JobStatus | null;
 }

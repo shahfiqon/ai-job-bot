@@ -90,3 +90,4 @@ class Job(Base):
     )
 
     company = relationship("Company", back_populates="jobs")
+    saved_jobs = relationship("SavedJob", back_populates="job", cascade="all, delete-orphan")

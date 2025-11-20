@@ -1,4 +1,11 @@
-import type { Job, JobDetail } from "@/types/job";
+import type {
+  Job,
+  JobDetail,
+  JobStatus,
+  SavedJob,
+  SavedJobCheckResponse,
+  SavedJobListResponse,
+} from "@/types/job";
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 const AUTH_TOKEN_KEY = "auth_token";
@@ -166,6 +173,139 @@ export async function fetchJobs(
   if (!response.ok) {
     throw new ApiError(
       `Failed to fetch jobs: ${response.statusText}`,
+      response.status,
+      response
+    );
+  }
+
+  const data = await response.json();
+  return data;
+}
+
+/**
+ * Save a job for the current user
+ */
+export async function saveJob(jobId: number, status: JobStatus = "saved"): Promise<SavedJob> {
+  const response = await fetch(`${API_BASE_URL}/api/saved-jobs`, {
+    method: "POST",
+    headers: getAuthHeaders(),
+    body: JSON.stringify({
+      job_id: jobId,
+      status,
+    }),
+  });
+
+  if (!response.ok) {
+    const error = await response.json().catch(() => ({ detail: "Failed to save job" }));
+    throw new ApiError(
+      error.detail || "Failed to save job",
+      response.status,
+      response
+    );
+  }
+
+  const data = await response.json();
+  return data;
+}
+
+/**
+ * Get saved jobs for the current user
+ */
+export async function getSavedJobs(
+  page: number = 1,
+  pageSize: number = 20,
+  status?: JobStatus
+): Promise<SavedJobListResponse> {
+  const searchParams = new URLSearchParams();
+  searchParams.append("page", String(page));
+  searchParams.append("page_size", String(pageSize));
+  if (status) {
+    searchParams.append("status", status);
+  }
+
+  const url = `${API_BASE_URL}/api/saved-jobs?${searchParams.toString()}`;
+
+  const response = await fetch(url, {
+    headers: getAuthHeaders(),
+  });
+
+  if (!response.ok) {
+    throw new ApiError(
+      `Failed to fetch saved jobs: ${response.statusText}`,
+      response.status,
+      response
+    );
+  }
+
+  const data = await response.json();
+  return data;
+}
+
+/**
+ * Update a saved job's status and/or notes
+ */
+export async function updateSavedJobStatus(
+  savedJobId: number,
+  status?: JobStatus,
+  notes?: string | null
+): Promise<SavedJob> {
+  const body: { status?: JobStatus; notes?: string | null } = {};
+  if (status !== undefined) {
+    body.status = status;
+  }
+  if (notes !== undefined) {
+    body.notes = notes;
+  }
+
+  const response = await fetch(`${API_BASE_URL}/api/saved-jobs/${savedJobId}`, {
+    method: "PATCH",
+    headers: getAuthHeaders(),
+    body: JSON.stringify(body),
+  });
+
+  if (!response.ok) {
+    const error = await response.json().catch(() => ({ detail: "Failed to update saved job" }));
+    throw new ApiError(
+      error.detail || "Failed to update saved job",
+      response.status,
+      response
+    );
+  }
+
+  const data = await response.json();
+  return data;
+}
+
+/**
+ * Delete a saved job
+ */
+export async function deleteSavedJob(savedJobId: number): Promise<void> {
+  const response = await fetch(`${API_BASE_URL}/api/saved-jobs/${savedJobId}`, {
+    method: "DELETE",
+    headers: getAuthHeaders(),
+  });
+
+  if (!response.ok) {
+    const error = await response.json().catch(() => ({ detail: "Failed to delete saved job" }));
+    throw new ApiError(
+      error.detail || "Failed to delete saved job",
+      response.status,
+      response
+    );
+  }
+}
+
+/**
+ * Check if a job is saved by the current user
+ */
+export async function checkJobSaved(jobId: number): Promise<SavedJobCheckResponse> {
+  const response = await fetch(`${API_BASE_URL}/api/saved-jobs/jobs/${jobId}/saved`, {
+    headers: getAuthHeaders(),
+  });
+
+  if (!response.ok) {
+    throw new ApiError(
+      `Failed to check saved job: ${response.statusText}`,
       response.status,
       response
     );

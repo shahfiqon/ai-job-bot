@@ -22,9 +22,16 @@ const PageLayout = ({ children }: PageLayoutProps) => {
           </Link>
           <nav className="flex items-center gap-4 text-sm">
             {isAuthenticated ? (
-              <Button variant="ghost" size="sm" onClick={logout}>
-                Logout
-              </Button>
+              <>
+                <Link href="/saved">
+                  <Button variant="ghost" size="sm">
+                    Saved Jobs
+                  </Button>
+                </Link>
+                <Button variant="ghost" size="sm" onClick={logout}>
+                  Logout
+                </Button>
+              </>
             ) : (
               <Link href="/login">
                 <Button variant="ghost" size="sm">

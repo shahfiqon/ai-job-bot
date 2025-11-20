@@ -28,7 +28,21 @@ import {
   CardTitle,
 } from "@/components/ui/card"
 import { Separator } from "@/components/ui/separator"
-import { ApiError, fetchJobById } from "@/lib/api"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
+import {
+  ApiError,
+  checkJobSaved,
+  deleteSavedJob,
+  fetchJobById,
+  saveJob,
+  updateSavedJobStatus,
+} from "@/lib/api"
 import {
   formatCompanySize,
   formatCurrency,
@@ -36,7 +50,7 @@ import {
   formatDateAbsolute,
   truncateText,
 } from "@/lib/utils"
-import type { Company, Job, JobDetail } from "@/types/job"
+import type { Company, Job, JobDetail, JobStatus, SavedJobCheckResponse } from "@/types/job"
 
 type JobPageProps = {
   params: {
@@ -94,6 +108,8 @@ export default function JobDetailPage() {
   const [company, setCompany] = useState<Company | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [savedJobInfo, setSavedJobInfo] = useState<SavedJobCheckResponse | null>(null)
+  const [isSaving, setIsSaving] = useState(false)
 
   useEffect(() => {
     if (Number.isNaN(jobId)) {
@@ -108,6 +124,15 @@ export default function JobDetailPage() {
         setJob(response)
         setCompany(response.company ?? null)
         setError(null)
+
+        // Check if job is saved
+        try {
+          const savedCheck = await checkJobSaved(jobId)
+          setSavedJobInfo(savedCheck)
+        } catch (err) {
+          // Ignore errors when checking saved status
+          console.error("Failed to check saved status:", err)
+        }
       } catch (err) {
         if (err instanceof ApiError && err.statusCode === 404) {
           notFound()
@@ -176,6 +201,66 @@ export default function JobDetailPage() {
   const posted = postedRelative && postedAbsolute 
     ? `${postedRelative} (${postedAbsolute})` 
     : postedRelative || postedAbsolute || "Not specified"
+
+  const handleSaveJob = async () => {
+    if (!job) return
+    setIsSaving(true)
+    try {
+      await saveJob(job.id, "saved")
+      setSavedJobInfo({ is_saved: true, saved_job_id: null, status: "saved" })
+      // Reload to get the saved_job_id
+      const savedCheck = await checkJobSaved(job.id)
+      setSavedJobInfo(savedCheck)
+    } catch (err) {
+      console.error("Failed to save job:", err)
+      alert(err instanceof Error ? err.message : "Failed to save job")
+    } finally {
+      setIsSaving(false)
+    }
+  }
+
+  const handleUnsaveJob = async () => {
+    if (!savedJobInfo?.saved_job_id) return
+    setIsSaving(true)
+    try {
+      await deleteSavedJob(savedJobInfo.saved_job_id)
+      setSavedJobInfo({ is_saved: false, saved_job_id: null, status: null })
+    } catch (err) {
+      console.error("Failed to unsave job:", err)
+      alert(err instanceof Error ? err.message : "Failed to unsave job")
+    } finally {
+      setIsSaving(false)
+    }
+  }
+
+  const handleStatusChange = async (newStatus: JobStatus) => {
+    if (!savedJobInfo?.saved_job_id) return
+    setIsSaving(true)
+    try {
+      await updateSavedJobStatus(savedJobInfo.saved_job_id, newStatus)
+      setSavedJobInfo({ ...savedJobInfo, status: newStatus })
+    } catch (err) {
+      console.error("Failed to update status:", err)
+      alert(err instanceof Error ? err.message : "Failed to update status")
+    } finally {
+      setIsSaving(false)
+    }
+  }
+
+  const getStatusColor = (status: JobStatus) => {
+    switch (status) {
+      case "saved":
+        return "secondary"
+      case "applied":
+        return "default"
+      case "interview":
+        return "default"
+      case "declined":
+        return "destructive"
+      default:
+        return "secondary"
+    }
+  }
 
   return (
     <AuthGuard>
@@ -282,7 +367,7 @@ export default function JobDetailPage() {
           </CardContent>
         </Card>
 
-        <div className="mt-6 flex flex-wrap gap-3">
+        <div className="mt-6 flex flex-wrap gap-3 items-center">
           {job.job_url ? (
             <Button asChild>
               <Link href={job.job_url} target="_blank" rel="noreferrer">
@@ -290,9 +375,45 @@ export default function JobDetailPage() {
               </Link>
             </Button>
           ) : null}
-          <Button type="button" variant="outline">
-            Save Job
-          </Button>
+          {savedJobInfo?.is_saved ? (
+            <>
+              <Badge variant={getStatusColor(savedJobInfo.status || "saved")}>
+                {savedJobInfo.status || "saved"}
+              </Badge>
+              <Select
+                value={savedJobInfo.status || "saved"}
+                onValueChange={(value) => handleStatusChange(value as JobStatus)}
+                disabled={isSaving}
+              >
+                <SelectTrigger className="w-[140px]">
+                  <SelectValue placeholder="Status" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="saved">Saved</SelectItem>
+                  <SelectItem value="applied">Applied</SelectItem>
+                  <SelectItem value="interview">Interview</SelectItem>
+                  <SelectItem value="declined">Declined</SelectItem>
+                </SelectContent>
+              </Select>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={handleUnsaveJob}
+                disabled={isSaving}
+              >
+                {isSaving ? "..." : "Unsave"}
+              </Button>
+            </>
+          ) : (
+            <Button
+              type="button"
+              variant="outline"
+              onClick={handleSaveJob}
+              disabled={isSaving}
+            >
+              {isSaving ? "Saving..." : "Save Job"}
+            </Button>
+          )}
           <Button type="button" variant="ghost">
             Share
           </Button>

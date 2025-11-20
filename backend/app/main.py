@@ -6,6 +6,7 @@ from loguru import logger
 
 from app.api.auth import router as auth_router
 from app.api.jobs import router as jobs_router
+from app.api.saved_jobs import router as saved_jobs_router
 from app.config import settings
 from app.logging_config import setup_logging
 
@@ -31,6 +32,7 @@ app.add_middleware(
 
 app.include_router(auth_router)
 app.include_router(jobs_router)
+app.include_router(saved_jobs_router)
 
 
 @app.on_event("startup")
