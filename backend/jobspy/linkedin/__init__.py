@@ -166,6 +166,9 @@ class LinkedIn(Scraper):
                             job_list.append(job_post)
                         if not continue_search():
                             break
+                    except ValueError as e:
+                        # Skip jobs with invalid countries
+                        continue
                     except Exception as e:
                         raise LinkedInException(str(e))
 
@@ -209,6 +212,8 @@ class LinkedIn(Scraper):
 
         metadata_card = job_card.find("div", class_="base-search-card__metadata")
         location = self._get_location(metadata_card)
+        if location is None:
+            return None
 
         datetime_tag = (
             metadata_card.find("time", class_="job-search-card__listdate")
@@ -321,13 +326,17 @@ class LinkedIn(Scraper):
             "applicants_count": applicants_count,
         }
 
-    def _get_location(self, metadata_card: Optional[Tag]) -> Location:
+    def _get_location(self, metadata_card: Optional[Tag]) -> Optional[Location]:
         """
         Extracts the location data from the job metadata card.
         :param metadata_card
-        :return: location
+        :return: location or None if country is invalid
         """
-        location = Location(country=Country.from_string(self.country))
+        try:
+            location = Location(country=Country.from_string(self.country))
+        except ValueError:
+            return None
+        
         if metadata_card is not None:
             location_tag = metadata_card.find(
                 "span", class_="job-search-card__location"
@@ -336,15 +345,21 @@ class LinkedIn(Scraper):
             parts = location_string.split(", ")
             if len(parts) == 2:
                 city, state = parts
-                location = Location(
-                    city=city,
-                    state=state,
-                    country=Country.from_string(self.country),
-                )
+                try:
+                    location = Location(
+                        city=city,
+                        state=state,
+                        country=Country.from_string(self.country),
+                    )
+                except ValueError:
+                    return None
             elif len(parts) == 3:
                 city, state, country = parts
-                country = Country.from_string(country)
-                location = Location(city=city, state=state, country=country)
+                try:
+                    country = Country.from_string(country)
+                    location = Location(city=city, state=state, country=country)
+                except ValueError:
+                    return None
         return location
 
     def _parse_job_url_direct(self, soup: BeautifulSoup) -> str | None:

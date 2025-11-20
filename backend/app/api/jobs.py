@@ -8,9 +8,11 @@ from sqlalchemy import and_, func, or_
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session, joinedload
 
+from app.auth import get_current_user
 from app.db import get_db
 from app.models.company import Company
 from app.models.job import Job
+from app.models.user import User
 from app.schemas import JobDetailResponse, JobListItemResponse, JobListResponse
 
 router = APIRouter(prefix="/api/jobs", tags=["jobs"])
@@ -90,6 +92,7 @@ def list_jobs(
         description="Filter jobs posted on or before this date (YYYY-MM-DD)",
     ),
     db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ) -> JobListResponse:
     """Return a paginated list of jobs ordered by most recent posting with optional filters."""
     try:
@@ -259,7 +262,11 @@ def list_jobs(
     "/{job_id}",
     response_model=JobDetailResponse,
 )
-def get_job(job_id: int, db: Session = Depends(get_db)) -> JobDetailResponse:
+def get_job(
+    job_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> JobDetailResponse:
     """Return detailed information for a job, including company data."""
     try:
         job = (

@@ -26,6 +26,9 @@ dependencies = [
     "markdownify<2.0.0,>=1.1.0",
     "regex<2025.0.0,>=2024.4.28",
     "nvitop>=1.6.0",
+    "python-jose[cryptography]",
+    "passlib[argon2]",
+    "python-multipart",
 ]
 
 [project.scripts]

@@ -1,6 +1,31 @@
 import type { Job, JobDetail } from "@/types/job";
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+const AUTH_TOKEN_KEY = "auth_token";
+
+/**
+ * Get the auth token from localStorage
+ */
+function getAuthToken(): string | null {
+  if (typeof window === "undefined") {
+    return null;
+  }
+  return localStorage.getItem(AUTH_TOKEN_KEY);
+}
+
+/**
+ * Get headers with auth token if available
+ */
+function getAuthHeaders(): HeadersInit {
+  const token = getAuthToken();
+  const headers: HeadersInit = {
+    "Content-Type": "application/json",
+  };
+  if (token) {
+    headers["Authorization"] = `Bearer ${token}`;
+  }
+  return headers;
+}
 
 export class ApiError extends Error {
   statusCode: number;
@@ -20,6 +45,7 @@ export class ApiError extends Error {
 export async function fetchJobById(id: number): Promise<JobDetail> {
   const response = await fetch(`${API_BASE_URL}/api/jobs/${id}`, {
     next: { revalidate: 60 }, // Cache for 60 seconds
+    headers: getAuthHeaders(),
   });
 
   if (!response.ok) {
@@ -134,6 +160,7 @@ export async function fetchJobs(
 
   const response = await fetch(url, {
     next: { revalidate: 60 },
+    headers: getAuthHeaders(),
   });
 
   if (!response.ok) {

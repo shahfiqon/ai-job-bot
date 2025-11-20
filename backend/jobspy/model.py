@@ -136,6 +136,7 @@ class Country(Enum):
     URUGUAY = ("uruguay", "uy")
     VENEZUELA = ("venezuela", "ve")
     VIETNAM = ("vietnam", "vn", "com")
+    MOLDOVA = ("moldova", "md")
 
     # internal for ziprecruiter
     US_CANADA = ("usa/ca", "www")

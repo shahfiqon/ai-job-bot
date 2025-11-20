@@ -46,6 +46,7 @@ def main(
 
 
 # Import command modules so they can register with the Typer app.
+from . import register as _register  # noqa: E402,F401
 from . import scrape as _scrape  # noqa: E402,F401
 
 

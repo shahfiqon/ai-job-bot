@@ -1,6 +1,9 @@
+"use client";
+
 import type { Metadata } from "next"
 import Link from "next/link"
-import { notFound } from "next/navigation"
+import { notFound, useParams } from "next/navigation"
+import { useEffect, useState } from "react"
 import {
   ArrowLeft,
   MapPin,
@@ -14,6 +17,7 @@ import {
 } from "lucide-react"
 
 import PageLayout from "@/components/page-layout"
+import AuthGuard from "@/components/auth-guard"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import {
@@ -82,82 +86,87 @@ const buildLocation = (job: Job) => {
   return parts || "Location to be announced"
 }
 
-export async function generateMetadata({
-  params,
-}: JobPageProps): Promise<Metadata> {
-  const jobId = Number.parseInt(params.id, 10)
+export default function JobDetailPage() {
+  const params = useParams()
+  const jobId = Number.parseInt(params.id as string, 10)
 
-  if (Number.isNaN(jobId)) {
-    return {
-      title: "Job Not Found | Job Apply Assistant",
-      description: "The requested job could not be found.",
-    }
-  }
+  const [job, setJob] = useState<JobDetail | null>(null)
+  const [company, setCompany] = useState<Company | null>(null)
+  const [isLoading, setIsLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
 
-  try {
-    const job = await fetchJobById(jobId)
-    const company = job.company_name ?? "Unknown Company"
-    const description = job.description
-      ? truncateText(job.description, 160)
-      : "Explore job opportunities with Job Apply Assistant."
-
-    return {
-      title: `${job.title} at ${company} | Job Apply Assistant`,
-      description,
-    }
-  } catch {
-    return {
-      title: "Job Not Found | Job Apply Assistant",
-      description: "The requested job could not be found.",
-    }
-  }
-}
-
-export default async function JobDetailPage({ params }: JobPageProps) {
-  const jobId = Number.parseInt(params.id, 10)
-
-  if (Number.isNaN(jobId)) {
-    notFound()
-  }
-
-  let job: JobDetail | null = null
-  let company: Company | null = null
-
-  try {
-    const response = await fetchJobById(jobId)
-    job = response
-    company = response.company ?? null
-  } catch (error) {
-    if (error instanceof ApiError && error.statusCode === 404) {
+  useEffect(() => {
+    if (Number.isNaN(jobId)) {
       notFound()
+      return
     }
 
-    const message =
-      error instanceof Error
-        ? error.message
-        : "An unexpected error occurred while loading this job."
+    async function loadJob() {
+      try {
+        setIsLoading(true)
+        const response = await fetchJobById(jobId)
+        setJob(response)
+        setCompany(response.company ?? null)
+        setError(null)
+      } catch (err) {
+        if (err instanceof ApiError && err.statusCode === 404) {
+          notFound()
+          return
+        }
 
+        const message =
+          err instanceof Error
+            ? err.message
+            : "An unexpected error occurred while loading this job."
+        setError(message)
+      } finally {
+        setIsLoading(false)
+      }
+    }
+
+    loadJob()
+  }, [jobId])
+
+  if (isLoading) {
     return (
-      <PageLayout>
-        <div className="container mx-auto py-10">
-          <Card className="mx-auto max-w-xl">
-            <CardHeader>
-              <CardTitle>Failed to load job details</CardTitle>
-              <CardDescription>{message}</CardDescription>
-            </CardHeader>
-            <CardContent className="flex flex-wrap gap-3">
-              <Button asChild>
-                <Link href="/">Back to jobs</Link>
-              </Button>
-            </CardContent>
-          </Card>
-        </div>
-      </PageLayout>
+      <AuthGuard>
+        <PageLayout>
+          <div className="container mx-auto py-10">
+            <div className="text-center">
+              <div className="mb-4 inline-block h-8 w-8 animate-spin rounded-full border-4 border-solid border-current border-r-transparent align-[-0.125em] motion-reduce:animate-[spin_1.5s_linear_infinite]" />
+              <p className="text-muted-foreground">Loading job details...</p>
+            </div>
+          </div>
+        </PageLayout>
+      </AuthGuard>
+    )
+  }
+
+  if (error) {
+    return (
+      <AuthGuard>
+        <PageLayout>
+          <div className="container mx-auto py-10">
+            <Card className="mx-auto max-w-xl">
+              <CardHeader>
+                <CardTitle>Failed to load job details</CardTitle>
+                <CardDescription>{error}</CardDescription>
+              </CardHeader>
+              <CardContent className="flex flex-wrap gap-3">
+                <Button asChild>
+                  <Link href="/">Back to jobs</Link>
+                </Button>
+              </CardContent>
+            </Card>
+          </div>
+        </PageLayout>
+      </AuthGuard>
     )
   }
 
   if (!job) {
     notFound()
+    return null
   }
 
   const location = buildLocation(job)
@@ -169,8 +178,9 @@ export default async function JobDetailPage({ params }: JobPageProps) {
     : postedRelative || postedAbsolute || "Not specified"
 
   return (
-    <PageLayout>
-      <div className="container mx-auto py-10">
+    <AuthGuard>
+      <PageLayout>
+        <div className="container mx-auto py-10">
         <Button
           asChild
           variant="ghost"
@@ -714,5 +724,6 @@ export default async function JobDetailPage({ params }: JobPageProps) {
         </Card>
       </div>
     </PageLayout>
+    </AuthGuard>
   )
 }

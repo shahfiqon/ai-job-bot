@@ -22,6 +22,18 @@ class Settings(BaseSettings):
         ],
         description="Comma-separated list of allowed origins for CORS",
     )
+    JWT_SECRET_KEY: str = Field(
+        default="your-secret-key-change-in-production",
+        description="Secret key for JWT token signing",
+    )
+    JWT_ALGORITHM: str = Field(
+        default="HS256",
+        description="Algorithm for JWT token signing",
+    )
+    ACCESS_TOKEN_EXPIRE_MINUTES: int = Field(
+        default=10080,
+        description="Access token expiration time in minutes (default: 7 days)",
+    )
 
     @field_validator("CORS_ORIGINS", mode="before")
     @classmethod
