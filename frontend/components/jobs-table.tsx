@@ -1,7 +1,9 @@
 "use client";
 
-import { Briefcase, DollarSign, MapPin } from "lucide-react";
+import { useState } from "react";
+import { Ban, Briefcase, DollarSign, MapPin } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import {
   Table,
   TableBody,
@@ -11,13 +13,49 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import type { Job, JobType } from "@/types/job";
+import { blockCompany } from "@/lib/api";
 import { formatCurrency, formatDateRelative, formatDateAbsolute } from "@/lib/utils";
 
 type JobsTableProps = {
   jobs: Job[];
+  onJobBlocked?: (jobId: number) => void;
 };
 
-const JobsTable = ({ jobs }: JobsTableProps) => {
+const JobsTable = ({ jobs, onJobBlocked }: JobsTableProps) => {
+  const [blockingIds, setBlockingIds] = useState<Set<number>>(new Set());
+
+  const handleBlockCompany = async (e: React.MouseEvent, job: Job) => {
+    e.stopPropagation(); // Prevent row click
+    
+    if (!job.company_id) {
+      alert("This job has no associated company to block.");
+      return;
+    }
+
+    const companyName = job.company_name || "this company";
+    if (!confirm(`Are you sure you want to block ${companyName}? All jobs from this company will be hidden from your search results.`)) {
+      return;
+    }
+
+    setBlockingIds((prev) => new Set(prev).add(job.id));
+    try {
+      await blockCompany(job.company_id);
+      // Optimistically remove job from list
+      if (onJobBlocked) {
+        onJobBlocked(job.id);
+      }
+    } catch (err) {
+      console.error("Failed to block company:", err);
+      alert(err instanceof Error ? err.message : "Failed to block company");
+    } finally {
+      setBlockingIds((prev) => {
+        const next = new Set(prev);
+        next.delete(job.id);
+        return next;
+      });
+    }
+  };
+
   if (!jobs?.length) {
     return (
       <div className="rounded-lg border bg-card p-8 text-center text-muted-foreground">
@@ -36,6 +74,7 @@ const JobsTable = ({ jobs }: JobsTableProps) => {
           <TableHead className="hidden lg:table-cell">Salary</TableHead>
           <TableHead className="hidden md:table-cell">Applicants</TableHead>
           <TableHead>Posted</TableHead>
+          <TableHead className="w-[80px]">Actions</TableHead>
         </TableRow>
       </TableHeader>
       <TableBody>
@@ -142,6 +181,20 @@ const JobsTable = ({ jobs }: JobsTableProps) => {
                   </div>
                 ) : (
                   "Not specified"
+                )}
+              </TableCell>
+              <TableCell>
+                {job.company_id && (
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={(e) => handleBlockCompany(e, job)}
+                    disabled={blockingIds.has(job.id)}
+                    title="Block company"
+                    className="h-8 w-8"
+                  >
+                    <Ban className="h-4 w-4 text-destructive" />
+                  </Button>
                 )}
               </TableCell>
             </TableRow>

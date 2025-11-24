@@ -14,6 +14,7 @@ import {
   Users,
   Globe,
   ExternalLink,
+  Ban,
 } from "lucide-react"
 
 import PageLayout from "@/components/page-layout"
@@ -37,6 +38,7 @@ import {
 } from "@/components/ui/select"
 import {
   ApiError,
+  blockCompany,
   checkJobSaved,
   deleteSavedJob,
   fetchJobById,
@@ -110,6 +112,7 @@ export default function JobDetailPage() {
   const [error, setError] = useState<string | null>(null)
   const [savedJobInfo, setSavedJobInfo] = useState<SavedJobCheckResponse | null>(null)
   const [isSaving, setIsSaving] = useState(false)
+  const [isBlocking, setIsBlocking] = useState(false)
 
   useEffect(() => {
     if (Number.isNaN(jobId)) {
@@ -244,6 +247,31 @@ export default function JobDetailPage() {
       alert(err instanceof Error ? err.message : "Failed to update status")
     } finally {
       setIsSaving(false)
+    }
+  }
+
+  const handleBlockCompany = async () => {
+    if (!job?.company_id) {
+      alert("This job has no associated company to block.")
+      return
+    }
+
+    const companyName = job.company_name || "this company"
+    if (!confirm(`Are you sure you want to block ${companyName}? All jobs from this company will be hidden from your search results.`)) {
+      return
+    }
+
+    setIsBlocking(true)
+    try {
+      await blockCompany(job.company_id)
+      alert(`${companyName} has been blocked. Redirecting to jobs list...`)
+      // Redirect to jobs list after successful block
+      window.location.href = "/"
+    } catch (err) {
+      console.error("Failed to block company:", err)
+      alert(err instanceof Error ? err.message : "Failed to block company")
+    } finally {
+      setIsBlocking(false)
     }
   }
 
@@ -417,6 +445,18 @@ export default function JobDetailPage() {
           <Button type="button" variant="ghost">
             Share
           </Button>
+          {job.company_id && (
+            <Button
+              type="button"
+              variant="destructive"
+              onClick={handleBlockCompany}
+              disabled={isBlocking}
+              className="gap-2"
+            >
+              <Ban className="h-4 w-4" />
+              {isBlocking ? "Blocking..." : "Block Company"}
+            </Button>
+          )}
         </div>
 
         <Separator className="my-8" />

@@ -1,3 +1,9 @@
+from .blocked_company import (
+    BlockedCompanyCreate,
+    BlockedCompanyListResponse,
+    BlockedCompanyListItemResponse,
+    BlockedCompanyResponse,
+)
 from .company import CompanyResponse
 from .job import (
     JobDetailResponse,
@@ -17,6 +23,10 @@ from .saved_job import (
 from .user import Token, TokenData, UserCreate, UserResponse
 
 __all__ = [
+    "BlockedCompanyCreate",
+    "BlockedCompanyListResponse",
+    "BlockedCompanyListItemResponse",
+    "BlockedCompanyResponse",
     "CompanyResponse",
     "JobListItemResponse",
     "JobResponse",

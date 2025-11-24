@@ -52,3 +52,8 @@ class Company(Base):
         back_populates="company",
         passive_deletes=True,
     )
+    blocked_companies = relationship(
+        "BlockedCompany",
+        back_populates="company",
+        passive_deletes=True,
+    )

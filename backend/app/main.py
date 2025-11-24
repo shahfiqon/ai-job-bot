@@ -5,6 +5,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from loguru import logger
 
 from app.api.auth import router as auth_router
+from app.api.blocked_companies import router as blocked_companies_router
 from app.api.jobs import router as jobs_router
 from app.api.saved_jobs import router as saved_jobs_router
 from app.config import settings
@@ -33,6 +34,7 @@ app.add_middleware(
 app.include_router(auth_router)
 app.include_router(jobs_router)
 app.include_router(saved_jobs_router)
+app.include_router(blocked_companies_router)
 
 
 @app.on_event("startup")

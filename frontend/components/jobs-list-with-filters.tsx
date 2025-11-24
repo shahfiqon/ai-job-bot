@@ -11,7 +11,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { fetchJobs, type JobFilters } from "@/lib/api";
+import { blockCompany, fetchJobs, type JobFilters } from "@/lib/api";
 import type { Job } from "@/types/job";
 
 export default function JobsListWithFilters() {
@@ -58,6 +58,12 @@ export default function JobsListWithFilters() {
     setPage(1);
   };
 
+  const handleJobBlocked = (jobId: number) => {
+    // Optimistically remove the job from the list
+    setJobs((prevJobs) => prevJobs.filter((job) => job.id !== jobId));
+    setTotal((prevTotal) => Math.max(0, prevTotal - 1));
+  };
+
   if (loading && jobs.length === 0) {
     return (
       <div className="flex items-center justify-center p-8">
@@ -90,7 +96,20 @@ export default function JobsListWithFilters() {
         onFiltersChange={handleFiltersChange}
         onClearFilters={handleClearFilters}
       />
-      <JobsTable jobs={jobs} />
+      <div className="mb-4 flex items-center justify-between">
+        <div className="text-sm text-muted-foreground">
+          {loading ? (
+            "Loading..."
+          ) : (
+            <>
+              Showing <span className="font-semibold text-foreground">{jobs.length}</span> of{" "}
+              <span className="font-semibold text-foreground">{total.toLocaleString()}</span>{" "}
+              {total === 1 ? "job" : "jobs"}
+            </>
+          )}
+        </div>
+      </div>
+      <JobsTable jobs={jobs} onJobBlocked={handleJobBlocked} />
       {total > 20 && (
         <div className="flex justify-center gap-2 mt-6">
           <Button

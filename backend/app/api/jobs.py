@@ -10,6 +10,7 @@ from sqlalchemy.orm import Session, joinedload
 
 from app.auth import get_current_user
 from app.db import get_db
+from app.models.blocked_company import BlockedCompany
 from app.models.company import Company
 from app.models.job import Job
 from app.models.user import User
@@ -211,6 +212,25 @@ def list_jobs(
         else:
             # Outer join to include company data for display, but don't filter out jobs without companies
             query = query.outerjoin(Company, Job.company_id == Company.id)
+        
+        # Filter out jobs from blocked companies
+        # LEFT JOIN blocked_companies to check if company is blocked by current user
+        # Only filter if job has a company_id (not NULL)
+        query = query.outerjoin(
+            BlockedCompany,
+            and_(
+                BlockedCompany.company_id == Job.company_id,
+                BlockedCompany.user_id == current_user.id,
+            ),
+        )
+        # Exclude jobs where blocked_company exists (company is blocked)
+        # But include jobs where company_id is NULL (no company to block)
+        filters.append(
+            or_(
+                BlockedCompany.id.is_(None),  # Company not blocked
+                Job.company_id.is_(None),  # Job has no company
+            )
+        )
         
         # Apply all filters
         if filters:

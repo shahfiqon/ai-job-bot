@@ -6,6 +6,10 @@ import type {
   SavedJobCheckResponse,
   SavedJobListResponse,
 } from "@/types/job";
+import type {
+  BlockedCompany,
+  BlockedCompanyListResponse,
+} from "@/types/blocked-company";
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 const AUTH_TOKEN_KEY = "auth_token";
@@ -306,6 +310,79 @@ export async function checkJobSaved(jobId: number): Promise<SavedJobCheckRespons
   if (!response.ok) {
     throw new ApiError(
       `Failed to check saved job: ${response.statusText}`,
+      response.status,
+      response
+    );
+  }
+
+  const data = await response.json();
+  return data;
+}
+
+/**
+ * Block a company for the current user
+ */
+export async function blockCompany(companyId: number): Promise<BlockedCompany> {
+  const response = await fetch(`${API_BASE_URL}/api/blocked-companies`, {
+    method: "POST",
+    headers: getAuthHeaders(),
+    body: JSON.stringify({
+      company_id: companyId,
+    }),
+  });
+
+  if (!response.ok) {
+    const error = await response.json().catch(() => ({ detail: "Failed to block company" }));
+    throw new ApiError(
+      error.detail || "Failed to block company",
+      response.status,
+      response
+    );
+  }
+
+  const data = await response.json();
+  return data;
+}
+
+/**
+ * Unblock a company for the current user
+ */
+export async function unblockCompany(companyId: number): Promise<void> {
+  const response = await fetch(`${API_BASE_URL}/api/blocked-companies/${companyId}`, {
+    method: "DELETE",
+    headers: getAuthHeaders(),
+  });
+
+  if (!response.ok) {
+    const error = await response.json().catch(() => ({ detail: "Failed to unblock company" }));
+    throw new ApiError(
+      error.detail || "Failed to unblock company",
+      response.status,
+      response
+    );
+  }
+}
+
+/**
+ * Get blocked companies for the current user
+ */
+export async function fetchBlockedCompanies(
+  page: number = 1,
+  pageSize: number = 20
+): Promise<BlockedCompanyListResponse> {
+  const searchParams = new URLSearchParams();
+  searchParams.append("page", String(page));
+  searchParams.append("page_size", String(pageSize));
+
+  const url = `${API_BASE_URL}/api/blocked-companies?${searchParams.toString()}`;
+
+  const response = await fetch(url, {
+    headers: getAuthHeaders(),
+  });
+
+  if (!response.ok) {
+    throw new ApiError(
+      `Failed to fetch blocked companies: ${response.statusText}`,
       response.status,
       response
     );
