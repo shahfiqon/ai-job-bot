@@ -56,3 +56,6 @@ def downgrade() -> None:
     op.drop_index(op.f("ix_blocked_companies_id"), table_name="blocked_companies")
     op.drop_table("blocked_companies")
 
+
+
+

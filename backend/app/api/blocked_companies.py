@@ -179,3 +179,6 @@ def unblock_company(
             status_code=500, detail="Database error while unblocking company"
         ) from exc
 
+
+
+

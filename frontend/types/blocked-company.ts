@@ -16,3 +16,6 @@ export interface BlockedCompanyListResponse {
   total_pages: number;
 }
 
+
+
+
