@@ -28,6 +28,11 @@ const PageLayout = ({ children }: PageLayoutProps) => {
                     Saved Jobs
                   </Button>
                 </Link>
+                <Link href="/profile">
+                  <Button variant="ghost" size="sm">
+                    Profile
+                  </Button>
+                </Link>
                 <Button variant="ghost" size="sm" onClick={logout}>
                   Logout
                 </Button>

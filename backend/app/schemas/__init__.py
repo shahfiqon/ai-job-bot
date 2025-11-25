@@ -20,7 +20,7 @@ from .saved_job import (
     SavedJobResponse,
     SavedJobUpdate,
 )
-from .user import Token, TokenData, UserCreate, UserResponse
+from .user import ResumeResponse, ResumeUpdate, Token, TokenData, UserCreate, UserResponse
 
 __all__ = [
     "BlockedCompanyCreate",
@@ -43,4 +43,6 @@ __all__ = [
     "UserResponse",
     "Token",
     "TokenData",
+    "ResumeUpdate",
+    "ResumeResponse",
 ]

@@ -10,6 +10,7 @@ import type {
   BlockedCompany,
   BlockedCompanyListResponse,
 } from "@/types/blocked-company";
+import type { ResumeResponse, ResumeUpdate } from "@/types/user";
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 const AUTH_TOKEN_KEY = "auth_token";
@@ -383,6 +384,51 @@ export async function fetchBlockedCompanies(
   if (!response.ok) {
     throw new ApiError(
       `Failed to fetch blocked companies: ${response.statusText}`,
+      response.status,
+      response
+    );
+  }
+
+  const data = await response.json();
+  return data;
+}
+
+/**
+ * Fetch resume JSON for the current user
+ */
+export async function fetchResume(): Promise<ResumeResponse> {
+  const response = await fetch(`${API_BASE_URL}/api/profile/resume`, {
+    headers: getAuthHeaders(),
+  });
+
+  if (!response.ok) {
+    throw new ApiError(
+      `Failed to fetch resume: ${response.statusText}`,
+      response.status,
+      response
+    );
+  }
+
+  const data = await response.json();
+  return data;
+}
+
+/**
+ * Update resume JSON for the current user
+ */
+export async function updateResume(resumeJson: string | null): Promise<ResumeResponse> {
+  const response = await fetch(`${API_BASE_URL}/api/profile/resume`, {
+    method: "PUT",
+    headers: getAuthHeaders(),
+    body: JSON.stringify({
+      resume_json: resumeJson,
+    } as ResumeUpdate),
+  });
+
+  if (!response.ok) {
+    const error = await response.json().catch(() => ({ detail: "Failed to update resume" }));
+    throw new ApiError(
+      error.detail || "Failed to update resume",
       response.status,
       response
     );
