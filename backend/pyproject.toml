@@ -29,6 +29,10 @@ dependencies = [
     "python-jose[cryptography]",
     "passlib[argon2]",
     "python-multipart",
+    "langchain>=0.3.0",
+    "langchain-anthropic>=0.2.0",
+    "langchain-openai>=0.2.0",
+    "langchain-core>=0.3.0",
 ]
 
 [project.scripts]

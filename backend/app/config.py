@@ -34,6 +34,26 @@ class Settings(BaseSettings):
         default=10080,
         description="Access token expiration time in minutes (default: 7 days)",
     )
+    OPENAI_API_KEY: str | None = Field(
+        default=None,
+        description="OpenAI API key for resume tailoring",
+    )
+    ANTHROPIC_API_KEY: str | None = Field(
+        default=None,
+        description="Anthropic/Claude API key for resume tailoring",
+    )
+    RESUME_LLM_PROVIDER: str = Field(
+        default="claude",
+        description="LLM provider for resume tailoring ('claude' or 'openai')",
+    )
+    RESUME_LLM_MODEL: str = Field(
+        default="claude-3-5-sonnet-20241022",
+        description="LLM model name for resume tailoring",
+    )
+    RESUME_LLM_TEMPERATURE: float = Field(
+        default=0.3,
+        description="Temperature setting for resume tailoring LLM (default: 0.3)",
+    )
 
     @field_validator("CORS_ORIGINS", mode="before")
     @classmethod
