@@ -10,6 +10,10 @@ import type {
   BlockedCompany,
   BlockedCompanyListResponse,
 } from "@/types/blocked-company";
+import type {
+  TailoredResume,
+  TailoredResumeListResponse,
+} from "@/types/tailored-resume";
 import type { ResumeResponse, ResumeUpdate } from "@/types/user";
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
@@ -429,6 +433,112 @@ export async function updateResume(resumeJson: string | null): Promise<ResumeRes
     const error = await response.json().catch(() => ({ detail: "Failed to update resume" }));
     throw new ApiError(
       error.detail || "Failed to update resume",
+      response.status,
+      response
+    );
+  }
+
+  const data = await response.json();
+  return data;
+}
+
+/**
+ * Generate a tailored resume for a specific job
+ */
+export async function generateTailoredResume(jobId: number): Promise<TailoredResume> {
+  const response = await fetch(`${API_BASE_URL}/api/tailored-resumes/generate/${jobId}`, {
+    method: "POST",
+    headers: getAuthHeaders(),
+  });
+
+  if (!response.ok) {
+    const error = await response.json().catch(() => ({ detail: "Failed to generate tailored resume" }));
+    throw new ApiError(
+      error.detail || "Failed to generate tailored resume",
+      response.status,
+      response
+    );
+  }
+
+  const data = await response.json();
+  return data;
+}
+
+/**
+ * Get tailored resume for a specific job
+ */
+export async function getTailoredResume(jobId: number): Promise<TailoredResume> {
+  const response = await fetch(`${API_BASE_URL}/api/tailored-resumes/${jobId}`, {
+    headers: getAuthHeaders(),
+  });
+
+  if (!response.ok) {
+    if (response.status === 404) {
+      throw new ApiError(
+        "Tailored resume not found for this job",
+        response.status,
+        response
+      );
+    }
+    throw new ApiError(
+      `Failed to fetch tailored resume: ${response.statusText}`,
+      response.status,
+      response
+    );
+  }
+
+  const data = await response.json();
+  return data;
+}
+
+/**
+ * List all tailored resumes for the current user
+ */
+export async function listTailoredResumes(
+  page: number = 1,
+  pageSize: number = 20
+): Promise<TailoredResumeListResponse> {
+  const searchParams = new URLSearchParams();
+  searchParams.append("page", String(page));
+  searchParams.append("page_size", String(pageSize));
+
+  const url = `${API_BASE_URL}/api/tailored-resumes?${searchParams.toString()}`;
+
+  const response = await fetch(url, {
+    headers: getAuthHeaders(),
+  });
+
+  if (!response.ok) {
+    throw new ApiError(
+      `Failed to fetch tailored resumes: ${response.statusText}`,
+      response.status,
+      response
+    );
+  }
+
+  const data = await response.json();
+  return data;
+}
+
+/**
+ * Update tailored resume for a specific job
+ */
+export async function updateTailoredResume(
+  jobId: number,
+  tailoredResumeJson: string
+): Promise<TailoredResume> {
+  const response = await fetch(`${API_BASE_URL}/api/tailored-resumes/${jobId}`, {
+    method: "PUT",
+    headers: getAuthHeaders(),
+    body: JSON.stringify({
+      tailored_resume_json: tailoredResumeJson,
+    }),
+  });
+
+  if (!response.ok) {
+    const error = await response.json().catch(() => ({ detail: "Failed to update tailored resume" }));
+    throw new ApiError(
+      error.detail || "Failed to update tailored resume",
       response.status,
       response
     );

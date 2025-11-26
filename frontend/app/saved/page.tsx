@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
-import { Briefcase, DollarSign, MapPin, Trash2 } from "lucide-react";
+import { Briefcase, DollarSign, MapPin, Trash2, FileText, Download, Loader2, Eye, X, Save } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -27,13 +27,17 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { Textarea } from "@/components/ui/textarea";
 import PageLayout from "@/components/page-layout";
 import AuthGuard from "@/components/auth-guard";
 import {
   ApiError,
   deleteSavedJob,
+  generateTailoredResume,
   getSavedJobs,
+  getTailoredResume,
   updateSavedJobStatus,
+  updateTailoredResume,
 } from "@/lib/api";
 import {
   formatCurrency,
@@ -51,6 +55,11 @@ export default function SavedJobsPage() {
   const [error, setError] = useState<string | null>(null);
   const [statusFilter, setStatusFilter] = useState<JobStatus | "all">("all");
   const [updatingIds, setUpdatingIds] = useState<Set<number>>(new Set());
+  const [generatingResumeIds, setGeneratingResumeIds] = useState<Set<number>>(new Set());
+  const [tailoredResumeJobIds, setTailoredResumeJobIds] = useState<Set<number>>(new Set());
+  const [viewingResumeJobId, setViewingResumeJobId] = useState<number | null>(null);
+  const [resumeJsonContent, setResumeJsonContent] = useState<string>("");
+  const [savingResume, setSavingResume] = useState(false);
 
   useEffect(() => {
     const loadSavedJobs = async () => {
@@ -64,6 +73,21 @@ export default function SavedJobsPage() {
         );
         setSavedJobs(data.saved_jobs);
         setTotal(data.total);
+        
+        // Check which jobs have tailored resumes
+        const jobIds = data.saved_jobs.map((sj) => sj.job.id);
+        const existingResumeIds = new Set<number>();
+        await Promise.all(
+          jobIds.map(async (jobId) => {
+            try {
+              await getTailoredResume(jobId);
+              existingResumeIds.add(jobId);
+            } catch (err) {
+              // Resume doesn't exist for this job, ignore
+            }
+          })
+        );
+        setTailoredResumeJobIds(existingResumeIds);
       } catch (err) {
         setError(
           err instanceof Error
@@ -126,6 +150,107 @@ export default function SavedJobsPage() {
         next.delete(savedJobId);
         return next;
       });
+    }
+  };
+
+  const handleGenerateResume = async (jobId: number) => {
+    setGeneratingResumeIds((prev) => new Set(prev).add(jobId));
+    try {
+      await generateTailoredResume(jobId);
+      setTailoredResumeJobIds((prev) => new Set(prev).add(jobId));
+      alert("Tailored resume generated successfully!");
+    } catch (err) {
+      console.error("Failed to generate tailored resume:", err);
+      const errorMessage =
+        err instanceof ApiError
+          ? err.message
+          : err instanceof Error
+          ? err.message
+          : "Failed to generate tailored resume";
+      alert(errorMessage);
+    } finally {
+      setGeneratingResumeIds((prev) => {
+        const next = new Set(prev);
+        next.delete(jobId);
+        return next;
+      });
+    }
+  };
+
+  const handleDownloadResume = async (jobId: number, jobTitle: string) => {
+    try {
+      const tailoredResume = await getTailoredResume(jobId);
+      const resumeData = JSON.parse(tailoredResume.tailored_resume_json);
+      
+      // Create a blob and download
+      const blob = new Blob([JSON.stringify(resumeData, null, 2)], {
+        type: "application/json",
+      });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `resume_${jobTitle.replace(/[^a-z0-9]/gi, "_").toLowerCase()}_${jobId}.json`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      console.error("Failed to download tailored resume:", err);
+      alert(
+        err instanceof Error
+          ? err.message
+          : "Failed to download tailored resume"
+      );
+    }
+  };
+
+  const handleViewResume = async (jobId: number) => {
+    try {
+      const tailoredResume = await getTailoredResume(jobId);
+      // Format JSON with proper indentation
+      const parsed = JSON.parse(tailoredResume.tailored_resume_json);
+      setResumeJsonContent(JSON.stringify(parsed, null, 2));
+      setViewingResumeJobId(jobId);
+    } catch (err) {
+      console.error("Failed to load tailored resume:", err);
+      alert(
+        err instanceof Error
+          ? err.message
+          : "Failed to load tailored resume"
+      );
+    }
+  };
+
+  const handleCloseResumeView = () => {
+    setViewingResumeJobId(null);
+    setResumeJsonContent("");
+  };
+
+  const handleSaveResume = async () => {
+    if (!viewingResumeJobId) return;
+    
+    // Validate JSON
+    try {
+      JSON.parse(resumeJsonContent);
+    } catch (err) {
+      alert("Invalid JSON format. Please check your input.");
+      return;
+    }
+
+    setSavingResume(true);
+    try {
+      await updateTailoredResume(viewingResumeJobId, resumeJsonContent);
+      alert("Resume updated successfully!");
+      handleCloseResumeView();
+    } catch (err) {
+      console.error("Failed to save tailored resume:", err);
+      alert(
+        err instanceof Error
+          ? err.message
+          : "Failed to save tailored resume"
+      );
+    } finally {
+      setSavingResume(false);
     }
   };
 
@@ -303,6 +428,7 @@ export default function SavedJobsPage() {
                       <TableHead>Status</TableHead>
                       <TableHead className="hidden lg:table-cell">Salary</TableHead>
                       <TableHead>Saved</TableHead>
+                      <TableHead className="w-[180px]">Resume</TableHead>
                       <TableHead className="w-[100px]">Actions</TableHead>
                     </TableRow>
                   </TableHeader>
@@ -311,6 +437,8 @@ export default function SavedJobsPage() {
                       const job = savedJob.job;
                       const locationLabel = formatLocation(job);
                       const isUpdating = updatingIds.has(savedJob.id);
+                      const isGenerating = generatingResumeIds.has(job.id);
+                      const hasTailoredResume = tailoredResumeJobIds.has(job.id);
 
                       return (
                         <TableRow key={savedJob.id}>
@@ -381,6 +509,54 @@ export default function SavedJobsPage() {
                             )}
                           </TableCell>
                           <TableCell>
+                            <div className="flex items-center gap-2">
+                              {hasTailoredResume ? (
+                                <>
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => handleViewResume(job.id)}
+                                    disabled={isGenerating}
+                                    className="flex items-center gap-2"
+                                  >
+                                    <Eye className="h-4 w-4" />
+                                    <span className="hidden sm:inline">View</span>
+                                  </Button>
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => handleDownloadResume(job.id, job.title)}
+                                    disabled={isGenerating}
+                                    className="flex items-center gap-2"
+                                  >
+                                    <Download className="h-4 w-4" />
+                                    <span className="hidden sm:inline">Download</span>
+                                  </Button>
+                                </>
+                              ) : (
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => handleGenerateResume(job.id)}
+                                  disabled={isGenerating}
+                                  className="flex items-center gap-2"
+                                >
+                                  {isGenerating ? (
+                                    <>
+                                      <Loader2 className="h-4 w-4 animate-spin" />
+                                      <span className="hidden sm:inline">Generating...</span>
+                                    </>
+                                  ) : (
+                                    <>
+                                      <FileText className="h-4 w-4" />
+                                      <span className="hidden sm:inline">Generate</span>
+                                    </>
+                                  )}
+                                </Button>
+                              )}
+                            </div>
+                          </TableCell>
+                          <TableCell>
                             <Button
                               variant="ghost"
                               size="sm"
@@ -420,6 +596,63 @@ export default function SavedJobsPage() {
                 </div>
               )}
             </>
+          )}
+
+          {/* Resume JSON View Modal */}
+          {viewingResumeJobId && (
+            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+              <Card className="w-full max-w-4xl max-h-[90vh] m-4 flex flex-col">
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-4">
+                  <div>
+                    <CardTitle>Tailored Resume JSON</CardTitle>
+                    <CardDescription>
+                      Edit the resume JSON content below
+                    </CardDescription>
+                  </div>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={handleCloseResumeView}
+                  >
+                    <X className="h-4 w-4" />
+                  </Button>
+                </CardHeader>
+                <CardContent className="flex-1 overflow-hidden flex flex-col">
+                  <Textarea
+                    value={resumeJsonContent}
+                    onChange={(e) => setResumeJsonContent(e.target.value)}
+                    className="flex-1 font-mono text-sm resize-none"
+                    placeholder="Resume JSON content will appear here..."
+                  />
+                </CardContent>
+                <div className="p-6 pt-0 flex justify-end gap-2">
+                  <Button
+                    variant="outline"
+                    onClick={handleCloseResumeView}
+                    disabled={savingResume}
+                  >
+                    Cancel
+                  </Button>
+                  <Button
+                    onClick={handleSaveResume}
+                    disabled={savingResume}
+                    className="flex items-center gap-2"
+                  >
+                    {savingResume ? (
+                      <>
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                        Saving...
+                      </>
+                    ) : (
+                      <>
+                        <Save className="h-4 w-4" />
+                        Save
+                      </>
+                    )}
+                  </Button>
+                </div>
+              </Card>
+            </div>
           )}
         </div>
       </PageLayout>

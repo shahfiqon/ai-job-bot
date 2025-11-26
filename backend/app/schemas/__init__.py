@@ -20,6 +20,12 @@ from .saved_job import (
     SavedJobResponse,
     SavedJobUpdate,
 )
+from .tailored_resume import (
+    TailoredResumeListItemResponse,
+    TailoredResumeListResponse,
+    TailoredResumeResponse,
+    TailoredResumeUpdate,
+)
 from .user import ResumeResponse, ResumeUpdate, Token, TokenData, UserCreate, UserResponse
 
 __all__ = [
@@ -39,6 +45,10 @@ __all__ = [
     "SavedJobListItemResponse",
     "SavedJobResponse",
     "SavedJobUpdate",
+    "TailoredResumeListItemResponse",
+    "TailoredResumeListResponse",
+    "TailoredResumeResponse",
+    "TailoredResumeUpdate",
     "UserCreate",
     "UserResponse",
     "Token",

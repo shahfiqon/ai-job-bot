@@ -9,6 +9,7 @@ from app.api.blocked_companies import router as blocked_companies_router
 from app.api.jobs import router as jobs_router
 from app.api.profile import router as profile_router
 from app.api.saved_jobs import router as saved_jobs_router
+from app.api.tailored_resumes import router as tailored_resumes_router
 from app.config import settings
 from app.logging_config import setup_logging
 
@@ -37,6 +38,7 @@ app.include_router(jobs_router)
 app.include_router(saved_jobs_router)
 app.include_router(blocked_companies_router)
 app.include_router(profile_router)
+app.include_router(tailored_resumes_router)
 
 
 @app.on_event("startup")
