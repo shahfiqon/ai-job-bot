@@ -15,6 +15,8 @@ import {
   Globe,
   ExternalLink,
   Ban,
+  FileText,
+  RefreshCw,
 } from "lucide-react"
 
 import PageLayout from "@/components/page-layout"
@@ -29,6 +31,7 @@ import {
   CardTitle,
 } from "@/components/ui/card"
 import { Separator } from "@/components/ui/separator"
+import { Textarea } from "@/components/ui/textarea"
 import {
   Select,
   SelectContent,
@@ -42,6 +45,8 @@ import {
   checkJobSaved,
   deleteSavedJob,
   fetchJobById,
+  generateTailoredResume,
+  getTailoredResume,
   saveJob,
   updateSavedJobStatus,
 } from "@/lib/api"
@@ -53,6 +58,7 @@ import {
   truncateText,
 } from "@/lib/utils"
 import type { Company, Job, JobDetail, JobStatus, SavedJobCheckResponse } from "@/types/job"
+import type { TailoredResume } from "@/types/tailored-resume"
 
 type JobPageProps = {
   params: {
@@ -113,6 +119,9 @@ export default function JobDetailPage() {
   const [savedJobInfo, setSavedJobInfo] = useState<SavedJobCheckResponse | null>(null)
   const [isSaving, setIsSaving] = useState(false)
   const [isBlocking, setIsBlocking] = useState(false)
+  const [hasTailoredResume, setHasTailoredResume] = useState(false)
+  const [isGeneratingResume, setIsGeneratingResume] = useState(false)
+  const [tailoredResume, setTailoredResume] = useState<TailoredResume | null>(null)
 
   useEffect(() => {
     if (Number.isNaN(jobId)) {
@@ -135,6 +144,24 @@ export default function JobDetailPage() {
         } catch (err) {
           // Ignore errors when checking saved status
           console.error("Failed to check saved status:", err)
+        }
+
+        // Check if tailored resume exists and fetch it
+        try {
+          const resume = await getTailoredResume(jobId)
+          setHasTailoredResume(true)
+          setTailoredResume(resume)
+
+          console.log("Tailored resume:", resume)
+        } catch (err) {
+          // If 404, no tailored resume exists yet
+          if (err instanceof ApiError && err.statusCode === 404) {
+            setHasTailoredResume(false)
+            setTailoredResume(null)
+          } else {
+            // Ignore other errors when checking tailored resume
+            console.error("Failed to check tailored resume:", err)
+          }
         }
       } catch (err) {
         if (err instanceof ApiError && err.statusCode === 404) {
@@ -272,6 +299,28 @@ export default function JobDetailPage() {
       alert(err instanceof Error ? err.message : "Failed to block company")
     } finally {
       setIsBlocking(false)
+    }
+  }
+
+  const handleGenerateResume = async () => {
+    if (!job) return
+    const wasExisting = hasTailoredResume
+    setIsGeneratingResume(true)
+    try {
+      const resume = await generateTailoredResume(job.id)
+      setHasTailoredResume(true)
+      setTailoredResume(resume)
+      alert(wasExisting ? "Resume regenerated successfully!" : "Resume generated successfully!")
+    } catch (err) {
+      console.error("Failed to generate tailored resume:", err)
+      const errorMessage = err instanceof ApiError 
+        ? err.message 
+        : err instanceof Error 
+        ? err.message 
+        : "Failed to generate tailored resume"
+      alert(errorMessage)
+    } finally {
+      setIsGeneratingResume(false)
     }
   }
 
@@ -445,6 +494,34 @@ export default function JobDetailPage() {
           <Button type="button" variant="ghost">
             Share
           </Button>
+          <Button
+            type="button"
+            variant="outline"
+            onClick={handleGenerateResume}
+            disabled={isGeneratingResume}
+            className="gap-2"
+          >
+            {isGeneratingResume ? (
+              <>
+                <RefreshCw className="h-4 w-4 animate-spin" />
+                {hasTailoredResume ? "Regenerating..." : "Generating..."}
+              </>
+            ) : (
+              <>
+                {hasTailoredResume ? (
+                  <>
+                    <RefreshCw className="h-4 w-4" />
+                    Regenerate Resume
+                  </>
+                ) : (
+                  <>
+                    <FileText className="h-4 w-4" />
+                    Generate Resume Content
+                  </>
+                )}
+              </>
+            )}
+          </Button>
           {job.company_id && (
             <Button
               type="button"
@@ -481,6 +558,39 @@ export default function JobDetailPage() {
             </div>
           </CardContent>
         </Card>
+
+        {/* Tailored Resume Content */}
+        {tailoredResume && (
+          <>
+            <Separator className="my-8" />
+            <Card>
+              <CardHeader>
+                <div className="flex items-center justify-between">
+                  <div>
+                    <CardTitle>Tailored Resume Content</CardTitle>
+                    <CardDescription>
+                      AI-generated resume tailored for this job position
+                    </CardDescription>
+                  </div>
+                </div>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-4">
+                  <div className="rounded-md border bg-muted/50 p-4">
+                    <Textarea
+                      value={tailoredResume.tailored_resume_json}
+                      readOnly
+                      className="min-h-[400px] font-mono text-sm resize-none"
+                    />
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    Last updated: {tailoredResume.updated_at ? new Date(tailoredResume.updated_at).toLocaleString() : "N/A"}
+                  </p>
+                </div>
+              </CardContent>
+            </Card>
+          </>
+        )}
 
         {/* LLM-Parsed Job Details */}
         {(job.summary || 
