@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from sqlalchemy import Column, DateTime, ForeignKey, Integer, Text, UniqueConstraint, func
+from sqlalchemy import Column, DateTime, ForeignKey, Integer, String, Text, UniqueConstraint, func
 from sqlalchemy.orm import relationship
 
 from app.db import Base
@@ -23,6 +23,7 @@ class TailoredResume(Base):
         index=True,
     )
     tailored_resume_json = Column(Text, nullable=False)
+    pdf_path = Column(String(512), nullable=True)
     created_at = Column(
         DateTime(timezone=True),
         nullable=False,

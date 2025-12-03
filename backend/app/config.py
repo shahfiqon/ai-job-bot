@@ -54,6 +54,14 @@ class Settings(BaseSettings):
         default=0.3,
         description="Temperature setting for resume tailoring LLM (default: 0.3)",
     )
+    RESUME_PDF_STORAGE_DIR: str = Field(
+        default="/tmp/resume_pdfs",
+        description="Directory to store generated resume PDFs",
+    )
+    JSONRESUME_THEME_PATH: str = Field(
+        default="/home/shadeform/jsonresume-theme-caffine",
+        description="Path to the jsonresume-theme-caffine Node.js project",
+    )
 
     @field_validator("CORS_ORIGINS", mode="before")
     @classmethod

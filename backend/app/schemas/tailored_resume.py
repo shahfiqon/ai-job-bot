@@ -12,6 +12,8 @@ class TailoredResumeResponse(BaseModel):
     user_id: int
     job_id: int
     tailored_resume_json: str
+    pdf_path: str | None = None
+    pdf_generated: bool = False
     created_at: datetime
     updated_at: datetime
 
@@ -28,6 +30,8 @@ class TailoredResumeListItemResponse(BaseModel):
     user_id: int
     job_id: int
     tailored_resume_json: str
+    pdf_path: str | None = None
+    pdf_generated: bool = False
     created_at: datetime
     updated_at: datetime
     job_title: str | None = None

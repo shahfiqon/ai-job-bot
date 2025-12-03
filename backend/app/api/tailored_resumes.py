@@ -2,8 +2,11 @@ from __future__ import annotations
 
 import json
 import math
+import subprocess
+from pathlib import Path
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi.responses import FileResponse
 from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 from sqlalchemy.orm import Session, joinedload
 
@@ -20,8 +23,10 @@ from app.schemas import (
     TailoredResumeUpdate,
 )
 from app.utils.resume_tailor import tailor_resume_for_job
+from app.services.resume_service import ResumeService
 
 router = APIRouter(prefix="/api/tailored-resumes", tags=["tailored-resumes"])
+resume_service = ResumeService()
 
 
 @router.post("/generate/{job_id}", response_model=TailoredResumeResponse, status_code=201)
@@ -84,13 +89,24 @@ def generate_tailored_resume(
         if existing:
             # Update existing tailored resume
             existing.tailored_resume_json = tailored_resume_json
+            # Clear PDF path since resume was updated
+            existing.pdf_path = None
             db.commit()
             db.refresh(existing)
+            
+            # Check if PDF exists
+            pdf_generated = False
+            if existing.pdf_path:
+                pdf_path_obj = Path(existing.pdf_path)
+                pdf_generated = pdf_path_obj.exists()
+            
             return TailoredResumeResponse(
                 id=existing.id,
                 user_id=existing.user_id,
                 job_id=existing.job_id,
                 tailored_resume_json=existing.tailored_resume_json,
+                pdf_path=existing.pdf_path,
+                pdf_generated=pdf_generated,
                 created_at=existing.created_at,
                 updated_at=existing.updated_at,
             )
@@ -104,11 +120,20 @@ def generate_tailored_resume(
             db.add(tailored_resume)
             db.commit()
             db.refresh(tailored_resume)
+            
+            # Check if PDF exists
+            pdf_generated = False
+            if tailored_resume.pdf_path:
+                pdf_path_obj = Path(tailored_resume.pdf_path)
+                pdf_generated = pdf_path_obj.exists()
+            
             return TailoredResumeResponse(
                 id=tailored_resume.id,
                 user_id=tailored_resume.user_id,
                 job_id=tailored_resume.job_id,
                 tailored_resume_json=tailored_resume.tailored_resume_json,
+                pdf_path=tailored_resume.pdf_path,
+                pdf_generated=pdf_generated,
                 created_at=tailored_resume.created_at,
                 updated_at=tailored_resume.updated_at,
             )
@@ -164,11 +189,19 @@ def get_tailored_resume(
                 detail="Tailored resume not found for this job",
             )
 
+        # Check if PDF exists
+        pdf_generated = False
+        if tailored_resume.pdf_path:
+            pdf_path_obj = Path(tailored_resume.pdf_path)
+            pdf_generated = pdf_path_obj.exists()
+
         return TailoredResumeResponse(
             id=tailored_resume.id,
             user_id=tailored_resume.user_id,
             job_id=tailored_resume.job_id,
             tailored_resume_json=tailored_resume.tailored_resume_json,
+            pdf_path=tailored_resume.pdf_path,
+            pdf_generated=pdf_generated,
             created_at=tailored_resume.created_at,
             updated_at=tailored_resume.updated_at,
         )
@@ -217,12 +250,21 @@ def list_tailored_resumes(
         tailored_resumes_response = []
         for tailored_resume in tailored_resumes:
             job = tailored_resume.job
+            
+            # Check if PDF exists
+            pdf_generated = False
+            if tailored_resume.pdf_path:
+                pdf_path_obj = Path(tailored_resume.pdf_path)
+                pdf_generated = pdf_path_obj.exists()
+            
             tailored_resumes_response.append(
                 TailoredResumeListItemResponse(
                     id=tailored_resume.id,
                     user_id=tailored_resume.user_id,
                     job_id=tailored_resume.job_id,
                     tailored_resume_json=tailored_resume.tailored_resume_json,
+                    pdf_path=tailored_resume.pdf_path,
+                    pdf_generated=pdf_generated,
                     created_at=tailored_resume.created_at,
                     updated_at=tailored_resume.updated_at,
                     job_title=job.title if job else None,
@@ -243,6 +285,140 @@ def list_tailored_resumes(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Database error while fetching tailored resumes",
+        ) from exc
+
+
+@router.post("/{job_id}/generate-pdf", response_model=TailoredResumeResponse)
+def generate_pdf(
+    job_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> TailoredResumeResponse:
+    """Generate PDF for a tailored resume."""
+    try:
+        # Fetch tailored resume
+        tailored_resume = (
+            db.query(TailoredResume)
+            .filter(
+                TailoredResume.user_id == current_user.id,
+                TailoredResume.job_id == job_id,
+            )
+            .first()
+        )
+
+        if not tailored_resume:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Tailored resume not found for this job",
+            )
+
+        # Generate PDF using resume service
+        try:
+            pdf_path = resume_service.ensure_pdf_generated(
+                resume_json=tailored_resume.tailored_resume_json,
+                user_id=current_user.id,
+                job_id=job_id,
+            )
+
+            # Update pdf_path in database
+            tailored_resume.pdf_path = str(pdf_path)
+            db.commit()
+            db.refresh(tailored_resume)
+
+            return TailoredResumeResponse(
+                id=tailored_resume.id,
+                user_id=tailored_resume.user_id,
+                job_id=tailored_resume.job_id,
+                tailored_resume_json=tailored_resume.tailored_resume_json,
+                pdf_path=tailored_resume.pdf_path,
+                pdf_generated=True,
+                created_at=tailored_resume.created_at,
+                updated_at=tailored_resume.updated_at,
+            )
+        except FileNotFoundError as exc:
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=f"Resume theme not found: {exc}",
+            ) from exc
+        except subprocess.CalledProcessError as exc:
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=f"Failed to generate PDF: {exc.stderr or exc.stdout}",
+            ) from exc
+        except ValueError as exc:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Invalid resume JSON: {exc}",
+            ) from exc
+
+    except HTTPException:
+        raise
+    except Exception as exc:
+        db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Unexpected error while generating PDF: {exc}",
+        ) from exc
+
+
+@router.get("/{job_id}/download")
+def download_pdf(
+    job_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Download generated PDF for a tailored resume."""
+    try:
+        # Fetch tailored resume
+        tailored_resume = (
+            db.query(TailoredResume)
+            .filter(
+                TailoredResume.user_id == current_user.id,
+                TailoredResume.job_id == job_id,
+            )
+            .first()
+        )
+
+        if not tailored_resume:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Tailored resume not found for this job",
+            )
+
+        # Check if PDF path exists
+        if not tailored_resume.pdf_path:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="PDF not generated yet. Please generate PDF first.",
+            )
+
+        pdf_path = Path(tailored_resume.pdf_path)
+        if not pdf_path.exists():
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="PDF file not found. Please regenerate PDF.",
+            )
+
+        # Get job info for filename
+        job = db.query(Job).filter(Job.id == job_id).first()
+        filename = f"resume_job_{job_id}.pdf"
+        if job and job.title:
+            # Sanitize job title for filename
+            safe_title = "".join(c if c.isalnum() or c in (" ", "-", "_") else "" for c in job.title)[:50]
+            filename = f"resume_{safe_title.replace(' ', '_')}_job_{job_id}.pdf"
+
+        return FileResponse(
+            path=str(pdf_path),
+            media_type="application/pdf",
+            filename=filename,
+        )
+
+    except HTTPException:
+        raise
+    except Exception as exc:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Unexpected error while downloading PDF: {exc}",
         ) from exc
 
 
@@ -272,14 +448,24 @@ def update_tailored_resume(
 
         # Update the tailored resume JSON
         tailored_resume.tailored_resume_json = tailored_resume_update.tailored_resume_json
+        # Clear PDF path since resume was updated
+        tailored_resume.pdf_path = None
         db.commit()
         db.refresh(tailored_resume)
+
+        # Check if PDF exists
+        pdf_generated = False
+        if tailored_resume.pdf_path:
+            pdf_path_obj = Path(tailored_resume.pdf_path)
+            pdf_generated = pdf_path_obj.exists()
 
         return TailoredResumeResponse(
             id=tailored_resume.id,
             user_id=tailored_resume.user_id,
             job_id=tailored_resume.job_id,
             tailored_resume_json=tailored_resume.tailored_resume_json,
+            pdf_path=tailored_resume.pdf_path,
+            pdf_generated=pdf_generated,
             created_at=tailored_resume.created_at,
             updated_at=tailored_resume.updated_at,
         )
