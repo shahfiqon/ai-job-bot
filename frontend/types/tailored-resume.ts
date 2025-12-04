@@ -3,6 +3,8 @@ export interface TailoredResume {
   user_id: number;
   job_id: number;
   tailored_resume_json: string;
+  pdf_path: string | null;
+  pdf_generated: boolean;
   created_at: string;
   updated_at: string;
 }
@@ -12,6 +14,8 @@ export interface TailoredResumeListItem {
   user_id: number;
   job_id: number;
   tailored_resume_json: string;
+  pdf_path: string | null;
+  pdf_generated: boolean;
   created_at: string;
   updated_at: string;
   job_title: string | null;

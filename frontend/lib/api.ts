@@ -548,3 +548,46 @@ export async function updateTailoredResume(
   return data;
 }
 
+/**
+ * Generate PDF for a tailored resume
+ */
+export async function generateTailoredResumePDF(jobId: number): Promise<TailoredResume> {
+  const response = await fetch(`${API_BASE_URL}/api/tailored-resumes/${jobId}/generate-pdf`, {
+    method: "POST",
+    headers: getAuthHeaders(),
+  });
+
+  if (!response.ok) {
+    const error = await response.json().catch(() => ({ detail: "Failed to generate PDF" }));
+    throw new ApiError(
+      error.detail || "Failed to generate PDF",
+      response.status,
+      response
+    );
+  }
+
+  const data = await response.json();
+  return data;
+}
+
+/**
+ * Download PDF for a tailored resume
+ */
+export async function downloadTailoredResumePDF(jobId: number): Promise<Blob> {
+  const response = await fetch(`${API_BASE_URL}/api/tailored-resumes/${jobId}/download`, {
+    headers: getAuthHeaders(),
+  });
+
+  if (!response.ok) {
+    const error = await response.json().catch(() => ({ detail: "Failed to download PDF" }));
+    throw new ApiError(
+      error.detail || "Failed to download PDF",
+      response.status,
+      response
+    );
+  }
+
+  const blob = await response.blob();
+  return blob;
+}
+

@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
-import { Briefcase, DollarSign, MapPin, Trash2, FileText, Download, Loader2, Eye, X, Save } from "lucide-react";
+import { Briefcase, DollarSign, MapPin, Trash2, FileText, Download, Loader2, Eye, X, Save, FileDown } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -38,6 +38,8 @@ import {
   getTailoredResume,
   updateSavedJobStatus,
   updateTailoredResume,
+  generateTailoredResumePDF,
+  downloadTailoredResumePDF,
 } from "@/lib/api";
 import {
   formatCurrency,
@@ -45,6 +47,7 @@ import {
   formatDateAbsolute,
 } from "@/lib/utils";
 import type { JobStatus, SavedJob } from "@/types/job";
+import type { TailoredResume } from "@/types/tailored-resume";
 
 export default function SavedJobsPage() {
   const [savedJobs, setSavedJobs] = useState<SavedJob[]>([]);
@@ -60,6 +63,8 @@ export default function SavedJobsPage() {
   const [viewingResumeJobId, setViewingResumeJobId] = useState<number | null>(null);
   const [resumeJsonContent, setResumeJsonContent] = useState<string>("");
   const [savingResume, setSavingResume] = useState(false);
+  const [generatingPdfIds, setGeneratingPdfIds] = useState<Set<number>>(new Set());
+  const [pdfGeneratedJobIds, setPdfGeneratedJobIds] = useState<Set<number>>(new Set());
 
   useEffect(() => {
     const loadSavedJobs = async () => {
@@ -74,20 +79,25 @@ export default function SavedJobsPage() {
         setSavedJobs(data.saved_jobs);
         setTotal(data.total);
         
-        // Check which jobs have tailored resumes
+        // Check which jobs have tailored resumes and PDFs
         const jobIds = data.saved_jobs.map((sj) => sj.job.id);
         const existingResumeIds = new Set<number>();
+        const existingPdfIds = new Set<number>();
         await Promise.all(
           jobIds.map(async (jobId) => {
             try {
-              await getTailoredResume(jobId);
+              const tailoredResume = await getTailoredResume(jobId);
               existingResumeIds.add(jobId);
+              if (tailoredResume.pdf_generated) {
+                existingPdfIds.add(jobId);
+              }
             } catch (err) {
               // Resume doesn't exist for this job, ignore
             }
           })
         );
         setTailoredResumeJobIds(existingResumeIds);
+        setPdfGeneratedJobIds(existingPdfIds);
       } catch (err) {
         setError(
           err instanceof Error
@@ -240,6 +250,12 @@ export default function SavedJobsPage() {
     setSavingResume(true);
     try {
       await updateTailoredResume(viewingResumeJobId, resumeJsonContent);
+      // Clear PDF status since resume was updated
+      setPdfGeneratedJobIds((prev) => {
+        const next = new Set(prev);
+        next.delete(viewingResumeJobId);
+        return next;
+      });
       alert("Resume updated successfully!");
       handleCloseResumeView();
     } catch (err) {
@@ -251,6 +267,56 @@ export default function SavedJobsPage() {
       );
     } finally {
       setSavingResume(false);
+    }
+  };
+
+  const handleGenerateAndDownloadPDF = async (jobId: number, jobTitle: string) => {
+    setGeneratingPdfIds((prev) => new Set(prev).add(jobId));
+    try {
+      // First, check if tailored resume exists, generate it if it doesn't
+      let tailoredResume: TailoredResume;
+      try {
+        tailoredResume = await getTailoredResume(jobId);
+      } catch (err) {
+        // If tailored resume doesn't exist, generate it first
+        if (err instanceof ApiError && err.statusCode === 404) {
+          tailoredResume = await generateTailoredResume(jobId);
+          setTailoredResumeJobIds((prev) => new Set(prev).add(jobId));
+        } else {
+          throw err;
+        }
+      }
+      
+      // Generate PDF if it doesn't exist
+      if (!tailoredResume.pdf_generated) {
+        tailoredResume = await generateTailoredResumePDF(jobId);
+        setPdfGeneratedJobIds((prev) => new Set(prev).add(jobId));
+      }
+
+      // Download the PDF
+      const blob = await downloadTailoredResumePDF(jobId);
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      const safeTitle = jobTitle.replace(/[^a-z0-9]/gi, "_").toLowerCase();
+      a.download = `resume_${safeTitle}_job_${jobId}.pdf`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      console.error("Failed to generate/download PDF:", err);
+      alert(
+        err instanceof Error
+          ? err.message
+          : "Failed to generate or download PDF"
+      );
+    } finally {
+      setGeneratingPdfIds((prev) => {
+        const next = new Set(prev);
+        next.delete(jobId);
+        return next;
+      });
     }
   };
 
@@ -516,7 +582,7 @@ export default function SavedJobsPage() {
                                     variant="outline"
                                     size="sm"
                                     onClick={() => handleViewResume(job.id)}
-                                    disabled={isGenerating}
+                                    disabled={isGenerating || generatingPdfIds.has(job.id)}
                                     className="flex items-center gap-2"
                                   >
                                     <Eye className="h-4 w-4" />
@@ -526,11 +592,30 @@ export default function SavedJobsPage() {
                                     variant="outline"
                                     size="sm"
                                     onClick={() => handleDownloadResume(job.id, job.title)}
-                                    disabled={isGenerating}
+                                    disabled={isGenerating || generatingPdfIds.has(job.id)}
                                     className="flex items-center gap-2"
                                   >
                                     <Download className="h-4 w-4" />
-                                    <span className="hidden sm:inline">Download</span>
+                                    <span className="hidden sm:inline">JSON</span>
+                                  </Button>
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => handleGenerateAndDownloadPDF(job.id, job.title)}
+                                    disabled={isGenerating || generatingPdfIds.has(job.id)}
+                                    className="flex items-center gap-2"
+                                  >
+                                    {generatingPdfIds.has(job.id) ? (
+                                      <>
+                                        <Loader2 className="h-4 w-4 animate-spin" />
+                                        <span className="hidden sm:inline">Generating...</span>
+                                      </>
+                                    ) : (
+                                      <>
+                                        <FileDown className="h-4 w-4" />
+                                        <span className="hidden sm:inline">PDF</span>
+                                      </>
+                                    )}
                                   </Button>
                                 </>
                               ) : (
