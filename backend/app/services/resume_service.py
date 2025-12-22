@@ -125,33 +125,38 @@ class ResumeService:
             tmp_resume_path = tmp_resume.name
 
         try:
-            logger.info(f"Generating PDF from {tmp_resume_path} to {output_path}")
+            # Resolve paths to absolute paths for Windows compatibility
+            abs_output_path = output_path.resolve()
+            abs_storage_dir = self.storage_dir.resolve()
+            abs_cli_script = self.cli_script.resolve()
+            
+            logger.info(f"Generating PDF from {tmp_resume_path} to {abs_output_path}")
 
             # Call Node.js CLI script to generate PDF
             result = subprocess.run(
                 [
                     "node",
-                    str(self.cli_script),
+                    str(abs_cli_script),
                     "-i",
                     tmp_resume_path,
                     "-o",
-                    str(output_path),
+                    str(abs_output_path),
                     "--tmp-dir",
-                    str(self.storage_dir),
+                    str(abs_storage_dir),
                 ],
                 capture_output=True,
                 text=True,
                 check=True,
             )
 
-            if not output_path.exists():
+            if not abs_output_path.exists():
                 raise FileNotFoundError(
-                    f"PDF generation completed but file not found at {output_path}. "
+                    f"PDF generation completed but file not found at {abs_output_path}. "
                     f"CLI output: {result.stdout}"
                 )
 
-            logger.info(f"Successfully generated PDF at {output_path}")
-            return output_path
+            logger.info(f"Successfully generated PDF at {abs_output_path}")
+            return abs_output_path
 
         except subprocess.CalledProcessError as e:
             error_msg = f"Failed to generate PDF: {e.stderr or e.stdout}"

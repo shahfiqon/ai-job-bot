@@ -1,3 +1,7 @@
+import os
+import tempfile
+from pathlib import Path
+
 from pydantic import Field, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
@@ -14,6 +18,10 @@ class Settings(BaseSettings):
     OLLAMA_SERVER_URL: str = Field(
         default="http://localhost:11434",
         description="Ollama server URL for LLM-based job description parsing",
+    )
+    LLAMA_SERVER_URL: str = Field(
+        default="http://localhost:8080",
+        description="llama-server URL for LLM-based job description parsing",
     )
     CORS_ORIGINS: list[str] = Field(
         default_factory=lambda: [
@@ -55,7 +63,7 @@ class Settings(BaseSettings):
         description="Temperature setting for resume tailoring LLM (default: 0.3)",
     )
     RESUME_PDF_STORAGE_DIR: str = Field(
-        default="/tmp/resume_pdfs",
+        default_factory=lambda: str(Path(tempfile.gettempdir()) / "resume_pdfs"),
         description="Directory to store generated resume PDFs",
     )
     JSONRESUME_THEME_PATH: str = Field(

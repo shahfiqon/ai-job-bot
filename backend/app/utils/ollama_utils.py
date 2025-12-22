@@ -3,10 +3,10 @@ import json
 from typing import Any
 
 from loguru import logger
-from ollama import Client
 
 from app.config import settings
 from app.schemas.structured_job import StructuredJobData
+from app.utils.llama_server_client import Client
 
 
 SYSTEM_PROMPT = """You are a JSON extraction assistant. Extract structured data from job descriptions.
@@ -126,15 +126,15 @@ def parse_job_description_with_ollama(
     use_json_format: bool = False,
 ) -> dict[str, Any]:
     """
-    Parse a job description into structured data using Ollama.
+    Parse a job description into structured data using llama-server.
     
     Args:
         description: The raw job description text to parse
-        model_name: Name of the Ollama model to use (default: qwen3:14b)
+        model_name: Name of the model (ignored, llama-server uses loaded model)
         timeout: Request timeout in seconds (default: 120)
-        ollama_url: Override Ollama server URL (uses config if not provided)
-        check_model: Whether to check if model exists before making request (default: False)
-        use_json_format: Whether to use Ollama's JSON format parameter (default: False)
+        ollama_url: Override llama-server URL (uses config if not provided)
+        check_model: Whether to check if model exists before making request (ignored)
+        use_json_format: Whether to use JSON format parameter (ignored)
         
     Returns:
         Dictionary containing:
@@ -151,27 +151,15 @@ def parse_job_description_with_ollama(
         ...     structured_data = result["data"]
         ...     print(structured_data.required_skills)
     """
-    base_url = ollama_url or settings.OLLAMA_SERVER_URL
-    
-    # Optionally check if the model is available first
-    if check_model:
-        model_check_result = check_ollama_model(model_name, ollama_url)
-        if not model_check_result.get("available", False):
-            logger.error(f"Model check failed: {model_check_result.get('error')}")
-            return {
-                "success": False,
-                "data": None,
-                "error": model_check_result.get("error", "Model not available"),
-                "raw_response": None,
-            }
+    base_url = ollama_url or settings.LLAMA_SERVER_URL
     
     # Prepare the prompt
     user_prompt = USER_PROMPT_TEMPLATE.format(description=description)
     
     try:
-        logger.info(f"Sending request to Ollama at {base_url} with model {model_name}")
+        logger.info(f"Sending request to llama-server at {base_url}")
         
-        # Create Ollama client with timeout
+        # Create llama-server client with timeout
         client = Client(host=base_url, timeout=timeout)
         
         # Combine system and user prompts for generate API
@@ -179,26 +167,23 @@ def parse_job_description_with_ollama(
         
         # Prepare generate parameters
         generate_params = {
-            "model": model_name,
+            "model": model_name,  # Ignored by llama-server but kept for compatibility
             "prompt": full_prompt,
             "options": {
                 "temperature": 0.1,  # Low temperature for more consistent output
                 "top_p": 0.9,
                 "num_ctx": 4096,  # Context window size
+                "max_tokens": 2048,
             },
         }
         
-        # Only include format parameter if requested (some models don't support it well)
-        if use_json_format:
-            generate_params["format"] = "json"
-        
-        # Make the generate request (more compatible than chat for some models)
+        # Make the generate request
         response = client.generate(**generate_params)
         
-        logger.debug(f"Full Ollama response: {response}")
+        logger.debug(f"Full llama-server response: {response}")
         logger.debug(f"Response type: {type(response)}")
         
-        # Extract the response content from generate API
+        # Extract the response content
         # The response object has a 'response' attribute containing the generated text
         if hasattr(response, "response"):
             raw_text = response.response
@@ -208,9 +193,8 @@ def parse_job_description_with_ollama(
             raw_text = ""
         
         if not raw_text:
-            logger.error(f"Empty response from Ollama. Full response: {response}")
-            # Check if there's an error message in the response
-            error_msg = "Empty response from Ollama server"
+            logger.error(f"Empty response from llama-server. Full response: {response}")
+            error_msg = "Empty response from llama-server"
             
             return {
                 "success": False,
@@ -219,7 +203,7 @@ def parse_job_description_with_ollama(
                 "raw_response": str(response),
             }
         
-        logger.debug(f"Raw Ollama response: {raw_text}")
+        logger.debug(f"Raw llama-server response: {raw_text}")
         
         # Try to parse the JSON response
         try:
@@ -257,7 +241,7 @@ def parse_job_description_with_ollama(
             }
             
         except json.JSONDecodeError as json_err:
-            logger.error(f"Failed to parse JSON from Ollama response: {json_err}")
+            logger.error(f"Failed to parse JSON from llama-server response: {json_err}")
             return {
                 "success": False,
                 "data": None,
@@ -274,11 +258,11 @@ def parse_job_description_with_ollama(
             }
             
     except Exception as err:
-        logger.error(f"Error during Ollama request: {err}")
+        logger.error(f"Error during llama-server request: {err}")
         return {
             "success": False,
             "data": None,
-            "error": f"Failed to connect to Ollama server: {str(err)}",
+            "error": f"Failed to connect to llama-server: {str(err)}",
             "raw_response": None,
         }
 

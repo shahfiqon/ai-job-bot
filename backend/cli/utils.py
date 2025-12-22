@@ -156,14 +156,14 @@ def map_dataframe_row_to_job(
         "job_url": _safe_str(row.get("job_url")),
         "job_url_direct": _safe_str(row.get("job_url_direct")),
         "title": _safe_str(row.get("title")) or "Untitled Role",
-        "company_name": _safe_str(row.get("company")),
+        "company_name": _truncate_str(_safe_str(row.get("company")), 512),
         "company_id": company_id,
         "description": _safe_str(row.get("description")),
         "company_url": _safe_str(row.get("company_url")),
         "company_url_direct": _safe_str(row.get("company_url_direct")),
-        "location_city": city,
-        "location_state": state,
-        "location_country": country,
+        "location_city": _truncate_str(city, 512),
+        "location_state": _truncate_str(state, 512),
+        "location_country": _truncate_str(country, 512),
         "compensation_min": _safe_float(row.get("min_amount")),
         "compensation_max": _safe_float(row.get("max_amount")),
         "compensation_currency": _safe_str(row.get("currency")),
@@ -174,8 +174,8 @@ def map_dataframe_row_to_job(
         "listing_type": _safe_str(row.get("listing_type")),
         "job_level": _safe_str(row.get("job_level")),
         "job_function": _safe_str(row.get("job_function")),
-        "company_industry": _safe_str(row.get("company_industry")),
-        "company_headquarters": _safe_str(row.get("company_headquarters")),
+        "company_industry": _truncate_str(_safe_str(row.get("company_industry")), 512),
+        "company_headquarters": _truncate_str(_safe_str(row.get("company_headquarters")), 512),
         "company_employees_count": _safe_str(row.get("company_employees_count")),
         "applicants_count": _safe_int(applicants_count_value),
         "emails": emails,
@@ -187,8 +187,8 @@ def map_dataframe_row_to_job(
             "required_skills": _coerce_json_field(structured_data.required_skills),
             "preferred_skills": _coerce_json_field(structured_data.preferred_skills),
             "required_years_experience": structured_data.required_years_experience,
-            "required_education": structured_data.required_education,
-            "preferred_education": structured_data.preferred_education,
+            "required_education": _truncate_str(structured_data.required_education, 512),
+            "preferred_education": _truncate_str(structured_data.preferred_education, 512),
             "responsibilities": _coerce_json_field(structured_data.responsibilities),
             "benefits": _coerce_json_field(structured_data.benefits),
             "work_arrangement": structured_data.work_arrangement,
@@ -286,6 +286,15 @@ def _safe_str(value: Any) -> str | None:
     if isinstance(value, str):
         return value.strip() or None
     return str(value)
+
+
+def _truncate_str(value: str | None, max_length: int) -> str | None:
+    """Truncate a string to a maximum length, returning None if value is None."""
+    if value is None:
+        return None
+    if len(value) <= max_length:
+        return value
+    return value[:max_length]
 
 
 def _safe_float(value: Any) -> float | None:

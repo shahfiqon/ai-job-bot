@@ -7,9 +7,9 @@ from dataclasses import dataclass
 from typing import Any, Sequence
 
 from loguru import logger
-from ollama import Client
 
 from app.config import settings
+from app.utils.llama_server_client import Client
 
 
 @dataclass(frozen=True)
@@ -51,7 +51,7 @@ def parse_company_description(
     client: Client | None = None,
 ) -> CompanyDescriptionInsights:
     """
-    Parse company description text with an Ollama LLM to derive insight booleans.
+    Parse company description text with llama-server to derive insight booleans.
 
     Falls back to lightweight heuristics when the LLM is unreachable or returns invalid JSON.
     """
@@ -60,7 +60,7 @@ def parse_company_description(
 
     normalized_description = " ".join(description.split())
 
-    base_url = ollama_url or settings.OLLAMA_SERVER_URL
+    base_url = ollama_url or settings.LLAMA_SERVER_URL
     llm_client = client
     if llm_client is None:
         llm_client = Client(host=base_url, timeout=timeout)
@@ -69,27 +69,26 @@ def parse_company_description(
     full_prompt = f"{LLM_SYSTEM_PROMPT}\n\n{prompt}"
 
     params: dict[str, Any] = {
-        "model": model_name,
+        "model": model_name,  # Ignored by llama-server but kept for compatibility
         "prompt": full_prompt,
         "options": {
             "temperature": 0.1,
             "top_p": 0.9,
             "num_ctx": 2048,
+            "max_tokens": 1024,
         },
     }
-    if use_json_format:
-        params["format"] = "json"
 
     try:
         response = llm_client.generate(**params)
         raw_text = _extract_response_text(response)
         insights = _insights_from_raw_text(raw_text)
         if insights:
-            logger.info("Derived company insights via Ollama model %s", model_name)
+            logger.info("Derived company insights via llama-server")
             return insights
-        logger.warning("Ollama returned unparsable content for company description.")
-    except Exception as exc:  # noqa: BLE001 - need to handle network/Ollama errors uniformly
-        logger.exception("Failed to parse company description via Ollama: %s", exc)
+        logger.warning("llama-server returned unparsable content for company description.")
+    except Exception as exc:  # noqa: BLE001 - need to handle network/llama-server errors uniformly
+        logger.exception("Failed to parse company description via llama-server: %s", exc)
 
     if fallback_to_heuristics:
         logger.info("Falling back to heuristic company description parsing.")
