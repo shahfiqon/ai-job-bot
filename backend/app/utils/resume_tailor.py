@@ -229,6 +229,24 @@ def _create_tailoring_chain(llm):
     Returns:
         LangChain chain ready to invoke
     """
+
+    # Prompt Example 
+    """
+    You are an expert Resume Writer and ATS Optimization Specialist.
+JOB DESCRIPTION:
+{job_description}
+MY MASTER RESUME:
+{resume_text}
+TASK:
+Rewrite my resume to perfectly match the Job Description.
+RULES:
+1. Use the EXACT keywords from the JD in skills and summary sections.
+2. Rephrase bullet points to match the responsibilities and metrics they care about.
+3. Do NOT lie or invent new experience.
+4. Only use real experience from my resume.
+5. Output in clean, well-formatted MARKDOWN.
+"""
+
     system_prompt = """You are an expert resume tailoring assistant. Your task is to intelligently refactor a user's resume content to better match a specific job application while STRICTLY preserving the exact JSON schema structure.
 
 CRITICAL RULES:
