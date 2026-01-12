@@ -63,6 +63,14 @@ class JobBaseResponse(BaseModel):
     location_restrictions: list[str] | None = None
     exclusive_location_requirement: bool | None = None
     
+    # DSPy-parsed fields from job description
+    is_python_main: bool | None = None
+    contract_feasible: bool | None = None
+    relocate_required: bool | None = None
+    specific_locations: list[str] | None = None
+    accepts_non_us: bool | None = None
+    screening_required: bool | None = None
+    
     created_at: datetime
     updated_at: datetime
 

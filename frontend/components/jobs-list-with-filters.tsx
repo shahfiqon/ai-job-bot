@@ -22,6 +22,7 @@ export default function JobsListWithFilters() {
   const [error, setError] = useState<string | null>(null);
   const [filters, setFilters] = useState<JobFilters>({
     max_employee_size: 111, // Default: exclude companies larger than 111 employees
+    relocate_required: false, // Default: exclude jobs that require relocation
   });
 
   useEffect(() => {
@@ -54,6 +55,7 @@ export default function JobsListWithFilters() {
   const handleClearFilters = () => {
     setFilters({
       max_employee_size: 111, // Always keep max_employee_size at 111 to exclude large companies
+      relocate_required: false, // Always keep relocate_required at false to exclude relocate-required jobs
     });
     setPage(1);
   };

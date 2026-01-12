@@ -62,6 +62,12 @@ export default function JobFiltersComponent({
     filters.max_applicants_count !== undefined ? 1 : 0,
     filters.date_posted_from ? 1 : 0,
     filters.date_posted_to ? 1 : 0,
+    filters.is_python_main !== undefined ? 1 : 0,
+    filters.contract_feasible !== undefined ? 1 : 0,
+    // Don't count relocate_required when it's false (the default)
+    filters.relocate_required !== undefined && filters.relocate_required !== false ? 1 : 0,
+    filters.accepts_non_us !== undefined ? 1 : 0,
+    filters.screening_required !== undefined ? 1 : 0,
   ].reduce((sum: number, count: number) => sum + count, 0);
   
   // Auto-expand when filters are active, or keep expanded state when user is interacting
@@ -614,6 +620,101 @@ export default function JobFiltersComponent({
                 className="text-sm font-normal cursor-pointer"
               >
                 Exclude Recruiting Companies
+              </Label>
+            </div>
+
+            <div className="flex items-center space-x-2">
+              <Checkbox
+                id="python-main"
+                checked={filters.is_python_main === true}
+                onCheckedChange={(checked: boolean) =>
+                  onFiltersChange({
+                    ...filters,
+                    is_python_main: checked ? true : undefined,
+                  })
+                }
+              />
+              <Label
+                htmlFor="python-main"
+                className="text-sm font-normal cursor-pointer"
+              >
+                Python Main Language
+              </Label>
+            </div>
+
+            <div className="flex items-center space-x-2">
+              <Checkbox
+                id="contract-feasible"
+                checked={filters.contract_feasible === true}
+                onCheckedChange={(checked: boolean) =>
+                  onFiltersChange({
+                    ...filters,
+                    contract_feasible: checked ? true : undefined,
+                  })
+                }
+              />
+              <Label
+                htmlFor="contract-feasible"
+                className="text-sm font-normal cursor-pointer"
+              >
+                Contract Feasible
+              </Label>
+            </div>
+
+            <div className="flex items-center space-x-2">
+              <Checkbox
+                id="relocate-required"
+                checked={filters.relocate_required === true}
+                onCheckedChange={(checked: boolean) =>
+                  onFiltersChange({
+                    ...filters,
+                    relocate_required: checked ? true : false,
+                  })
+                }
+              />
+              <Label
+                htmlFor="relocate-required"
+                className="text-sm font-normal cursor-pointer"
+              >
+                Include Relocate Required Jobs
+              </Label>
+            </div>
+
+            <div className="flex items-center space-x-2">
+              <Checkbox
+                id="accepts-non-us"
+                checked={filters.accepts_non_us === true}
+                onCheckedChange={(checked: boolean) =>
+                  onFiltersChange({
+                    ...filters,
+                    accepts_non_us: checked ? true : undefined,
+                  })
+                }
+              />
+              <Label
+                htmlFor="accepts-non-us"
+                className="text-sm font-normal cursor-pointer"
+              >
+                Accepts Non-US Candidates
+              </Label>
+            </div>
+
+            <div className="flex items-center space-x-2">
+              <Checkbox
+                id="screening-required"
+                checked={filters.screening_required === true}
+                onCheckedChange={(checked: boolean) =>
+                  onFiltersChange({
+                    ...filters,
+                    screening_required: checked ? true : undefined,
+                  })
+                }
+              />
+              <Label
+                htmlFor="screening-required"
+                className="text-sm font-normal cursor-pointer"
+              >
+                Screening Required
               </Label>
             </div>
           </div>

@@ -96,7 +96,7 @@ class JobExtraction(dspy.Signature):
     )
 
     is_python_main: bool = dspy.OutputField(
-        desc="True if Python is listed first/prominently in the job description OR if 70%+ of mentioned technologies are Python-related. Examples: 'Python Developer' (true), 'Full-stack: React, Node, Python' (false), 'Backend: Python, Django, FastAPI, PostgreSQL' (true)"
+        desc="True ONLY if Python is explicitly mentioned in the job description AND (Python is listed first/prominently OR 70%+ of mentioned technologies are Python-related). False if Python is not mentioned at all. Examples: 'Python Developer' (true), 'Full-stack: React, Node, TypeScript' (false - no Python mentioned), 'Backend: Python, Django, FastAPI, PostgreSQL' (true), 'TypeScript, React, PostgreSQL' (false - no Python mentioned)"
     )
 
     is_remote_in_usa: bool = dspy.OutputField(

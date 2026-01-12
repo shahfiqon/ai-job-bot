@@ -132,6 +132,15 @@ const JobsTable = ({ jobs, onJobBlocked }: JobsTableProps) => {
                       <span>{locationLabel}</span>
                     </div>
                   ) : null}
+                  {job.specific_locations && job.specific_locations.length > 0 && (
+                    <div className="flex flex-wrap gap-1">
+                      {job.specific_locations.map((loc, idx) => (
+                        <Badge key={idx} variant="outline" className="text-xs">
+                          {loc}
+                        </Badge>
+                      ))}
+                    </div>
+                  )}
                   {job.is_remote ? (
                     <Badge variant="secondary" className="w-fit">
                       Remote

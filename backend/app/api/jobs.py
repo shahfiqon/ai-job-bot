@@ -92,6 +92,27 @@ def list_jobs(
         default=None,
         description="Filter jobs posted on or before this date (YYYY-MM-DD)",
     ),
+    # DSPy-parsed filters
+    is_python_main: bool | None = Query(
+        default=None,
+        description="Filter for jobs where Python is the main language",
+    ),
+    contract_feasible: bool | None = Query(
+        default=None,
+        description="Filter for jobs that are contract feasible",
+    ),
+    relocate_required: bool | None = Query(
+        default=False,
+        description="Filter for jobs that require relocation (default: False to exclude relocate-required jobs)",
+    ),
+    accepts_non_us: bool | None = Query(
+        default=None,
+        description="Filter for jobs that accept non-US candidates",
+    ),
+    screening_required: bool | None = Query(
+        default=None,
+        description="Filter for jobs that require screening",
+    ),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ) -> JobListResponse:
@@ -150,6 +171,23 @@ def list_jobs(
             filters.append(Job.date_posted >= date_posted_from)
         if date_posted_to is not None:
             filters.append(Job.date_posted <= date_posted_to)
+        
+        # DSPy-parsed filters
+        if is_python_main is not None:
+            filters.append(Job.is_python_main == is_python_main)
+        if contract_feasible is not None:
+            filters.append(Job.contract_feasible == contract_feasible)
+        if relocate_required is not None:
+            if relocate_required is False:
+                # Exclude jobs that require relocation (include False and None)
+                filters.append(or_(Job.relocate_required == False, Job.relocate_required.is_(None)))
+            else:
+                # Include only jobs that require relocation
+                filters.append(Job.relocate_required == True)
+        if accepts_non_us is not None:
+            filters.append(Job.accepts_non_us == accepts_non_us)
+        if screening_required is not None:
+            filters.append(Job.screening_required == screening_required)
         
         # Company filters - need to join with Company table
         company_filters_needed = (

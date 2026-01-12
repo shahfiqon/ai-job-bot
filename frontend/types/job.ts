@@ -72,6 +72,14 @@ export interface Job {
   location_restrictions: string[] | null;
   exclusive_location_requirement: boolean | null;
   
+  // DSPy-parsed fields from job description
+  is_python_main: boolean | null;
+  contract_feasible: boolean | null;
+  relocate_required: boolean | null;
+  specific_locations: string[] | null;
+  accepts_non_us: boolean | null;
+  screening_required: boolean | null;
+  
   created_at: Date;
   updated_at: Date;
 }

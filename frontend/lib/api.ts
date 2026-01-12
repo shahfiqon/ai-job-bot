@@ -100,6 +100,12 @@ export interface JobFilters {
   // Date posted filters
   date_posted_from?: string; // ISO date string (YYYY-MM-DD)
   date_posted_to?: string; // ISO date string (YYYY-MM-DD)
+  // DSPy-parsed filters
+  is_python_main?: boolean;
+  contract_feasible?: boolean;
+  relocate_required?: boolean;
+  accepts_non_us?: boolean;
+  screening_required?: boolean;
 }
 
 /**
@@ -169,6 +175,22 @@ export async function fetchJobs(
     }
     if (filters.date_posted_to) {
       searchParams.append("date_posted_to", filters.date_posted_to);
+    }
+    // DSPy-parsed filters
+    if (filters.is_python_main !== undefined) {
+      searchParams.append("is_python_main", String(filters.is_python_main));
+    }
+    if (filters.contract_feasible !== undefined) {
+      searchParams.append("contract_feasible", String(filters.contract_feasible));
+    }
+    if (filters.relocate_required !== undefined) {
+      searchParams.append("relocate_required", String(filters.relocate_required));
+    }
+    if (filters.accepts_non_us !== undefined) {
+      searchParams.append("accepts_non_us", String(filters.accepts_non_us));
+    }
+    if (filters.screening_required !== undefined) {
+      searchParams.append("screening_required", String(filters.screening_required));
     }
   }
 

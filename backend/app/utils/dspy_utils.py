@@ -60,7 +60,7 @@ class JobExtraction(dspy.Signature):
     )
 
     is_python_main: bool = dspy.OutputField(
-        desc="True if Python is listed first/prominently in the job description OR if 70%+ of mentioned technologies are Python-related. Examples: 'Python Developer' (true), 'Full-stack: React, Node, Python' (false), 'Backend: Python, Django, FastAPI, PostgreSQL' (true)"
+        desc="True ONLY if Python is explicitly mentioned in the job description AND (Python is listed first/prominently OR 70%+ of mentioned technologies are Python-related). False if Python is not mentioned at all. Examples: 'Python Developer' (true), 'Full-stack: React, Node, TypeScript' (false - no Python mentioned), 'Backend: Python, Django, FastAPI, PostgreSQL' (true), 'TypeScript, React, PostgreSQL' (false - no Python mentioned)"
     )
 
     contract_feasible: bool = dspy.OutputField(
@@ -207,10 +207,12 @@ async def extract_job_info(
             loc.strip() for loc in specific_locations_str.split(",") if loc.strip()
         ]
 
+    required_skills = [skill.lower() for skill in getattr(result, "required_skills", []) if isinstance(skill, str)]
+
     # Build output structure
     output = {
         "is_python_main": FieldValue(
-            value=getattr(result, "is_python_main", None),
+            value=getattr(result, "is_python_main", False) and "python" in required_skills,
             confidence=_compute_confidence(getattr(result, "is_python_main", None), "is_python_main")
         ),
         "contract_feasible": FieldValue(
