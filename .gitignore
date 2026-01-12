@@ -234,3 +234,10 @@ frontend/next-env.d.ts
 
 notebooks/
 resume_pdfs/
+
+*.sql
+*.graphql
+.python-version 
+**/test-scripts/example-jobs
+**/test-scripts/*.json
+SPEC.md

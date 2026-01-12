@@ -37,16 +37,64 @@
             "justMyCode": false
         },
         {
-            "name": "CLI: Scrape Jobs (python OR rust, usa, 1)",
+            "name": "CLI: Jobbot Scrape",
             "type": "debugpy",
             "request": "launch",
-            "code": "from cli.scrape import scrape; scrape(search_term='python OR rust', location='usa', results_wanted=1)",
+            "module": "cli.main",
+            "args": [
+                "scrape",
+                "--search-term", "python",
+                "--location", "usa",
+                "--results-wanted", "15"
+            ],
             "console": "integratedTerminal",
             "cwd": "${workspaceFolder}/backend",
             "env": {
                 "PYTHONPATH": "${workspaceFolder}/backend"
             },
             "justMyCode": false
+        },
+        {
+            "name": "CLI: Jobbot Scrape (with hours-old)",
+            "type": "debugpy",
+            "request": "launch",
+            "module": "cli.main",
+            "args": [
+                "scrape",
+                "--search-term", "python",
+                "--location", "usa",
+                "--results-wanted", "15",
+                "--hours-old", "1"
+            ],
+            "console": "integratedTerminal",
+            "cwd": "${workspaceFolder}/backend",
+            "env": {
+                "PYTHONPATH": "${workspaceFolder}/backend"
+            },
+            "justMyCode": false
+        },
+        {
+            "name": "Debugger: Run selected file.",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${file}",
+            "cwd": "${workspaceFolder}/backend",
+            "console": "integratedTerminal",
+            "env": {
+                "PYTHONPATH": "${workspaceFolder}/backend"
+            }
+        },
+        {
+            "name": "Debugger: Job Parser",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${workspaceFolder}/backend/test-scripts/job_parser.py",
+            "cwd": "${workspaceFolder}/backend/test-scripts",
+            "console": "integratedTerminal",
+            "env": {
+                "PYTHONPATH": "${workspaceFolder}/backend"
+            },
+            "args": ["./example-jobs", "--output", "jobs.json"]
         }
     ]
 }

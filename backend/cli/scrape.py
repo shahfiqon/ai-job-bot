@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import asyncio
+
 import pandas as pd
 import typer
 from jobspy import scrape_jobs as jobspy_scrape_jobs
@@ -20,7 +22,7 @@ from app.config import settings
 from app.db import SessionLocal
 from app.models.company import Company
 from app.models.job import Job
-from app.utils.ollama_utils import parse_job_description_with_ollama
+from app.utils.dspy_utils import extract_job_info
 from cli.main import app, console
 from cli.utils import (
     fetch_company_from_proxycurl,
@@ -52,6 +54,14 @@ def scrape(
         show_default=True,
         help="Number of jobs to request from job boards.",
     ),
+    hours_old: int | None = typer.Option(
+        None,
+        "--hours-old",
+        "-ho",
+        min=1,
+        show_default=True,
+        help="Filter jobs by hours old (e.g., 24 for jobs posted in last 24 hours). If not specified, no time filter is applied.",
+    )
 ) -> None:
     """Scrape jobs, enrich companies, and persist everything to PostgreSQL."""
     console.print(
@@ -59,7 +69,8 @@ def scrape(
             f"[bold white]Job Scraping Configuration[/]\n"
             f"[cyan]Search:[/] {search_term}\n"
             f"[cyan]Location:[/] {location}\n"
-            f"[cyan]Results:[/] {results_wanted}",
+            f"[cyan]Results:[/] {results_wanted}\n"
+            f"[cyan]Hours old:[/] {hours_old}",
             border_style="cyan",
         )
     )
@@ -84,17 +95,17 @@ def scrape(
 
         with progress:
             scrape_task = progress.add_task(
-                "[bold]Scraping jobs from LinkedIn...[/bold]", total=1
+                "[bold]Scraping jobs from LinkedIn & Indeed...[/bold]", total=1
             )
             try:
                 jobs_df = jobspy_scrape_jobs(
-                    site_name=["linkedin"],
+                    site_name=["linkedin", "indeed"],
                     search_term=search_term,
                     location=location,
                     results_wanted=results_wanted,
                     linkedin_fetch_description=True,
                     is_remote=True,
-                    hours_old=6,
+                    hours_old=hours_old,
                 )
             except Exception as exc:  # noqa: BLE001
                 logger.exception("Job scraping failed")
@@ -106,6 +117,17 @@ def scrape(
             if jobs_df is None or jobs_df.empty:
                 console.print("[yellow]No jobs found for the given criteria.[/]")
                 raise typer.Exit(code=0)
+
+            # Filter out non-remote jobs
+            if "is_remote" in jobs_df.columns:
+                jobs_before_remote_filter = len(jobs_df)
+                # Keep only jobs where is_remote is True (exclude False and None)
+                jobs_df = jobs_df[jobs_df["is_remote"] == True].copy()
+                remote_filtered_count = jobs_before_remote_filter - len(jobs_df)
+                if remote_filtered_count > 0:
+                    console.print(
+                        f"[yellow]Filtered out {remote_filtered_count} non-remote jobs.[/]"
+                    )
 
             original_jobs_count = len(jobs_df)
             console.print(
@@ -186,51 +208,30 @@ def scrape(
                     "[bold]Enriching company profiles...[/bold]",
                     total=len(linkedin_urls),
                 )
-                for linkedin_url in linkedin_urls:
-                    company_id = _ensure_company(
-                        session,
-                        linkedin_url,
-                        company_cache,
-                        company_stats,
-                    )
-                    if company_id:
-                        company_cache[linkedin_url] = company_id
-                    progress.advance(company_task, 1)
+                # Process companies in batches
+                _process_companies_in_batches(
+                    session,
+                    linkedin_urls,
+                    company_cache,
+                    company_stats,
+                    company_task,
+                    progress,
+                    batch_size=10,
+                )
                 progress.update(company_task, completed=len(linkedin_urls))
                 session.commit()
 
-            # Parse job descriptions with LLM
+            # Parse job descriptions with LLM using async batch processing
             console.print("[cyan]Parsing job descriptions with LLM...[/]")
             parsing_task = progress.add_task(
                 "[bold]Parsing job descriptions with LLM...[/bold]",
                 total=len(jobs_df),
             )
             
-            parsed_data_map = {}
-            parse_stats = {
-                "success": 0,
-                "failed": 0,
-            }
-            
-            for idx, row in jobs_df.iterrows():
-                description = row.get("description")
-                if description and isinstance(description, str) and description.strip():
-                    result = parse_job_description_with_ollama(
-                        description=description,
-                        timeout=240,
-                    )
-                    if result["success"] and result["data"]:
-                        parsed_data_map[idx] = result["data"]
-                        parse_stats["success"] += 1
-                        logger.debug(f"Successfully parsed job at index {idx}")
-                    else:
-                        parse_stats["failed"] += 1
-                        logger.warning(f"Failed to parse job at index {idx}: {result.get('error')}")
-                else:
-                    parse_stats["failed"] += 1
-                    logger.debug(f"No description for job at index {idx}")
-                
-                progress.advance(parsing_task, 1)
+            # Process jobs in batches asynchronously
+            parsed_data_map, parse_stats = asyncio.run(
+                _parse_jobs_in_batches(jobs_df, parsing_task, progress)
+            )
             
             progress.update(parsing_task, completed=len(jobs_df))
             console.print(
@@ -280,6 +281,136 @@ def scrape(
         raise typer.Exit(code=1) from exc
     finally:
         session.close()
+
+
+async def _parse_jobs_in_batches(
+    jobs_df: pd.DataFrame,
+    parsing_task,
+    progress: Progress,
+    batch_size: int = 4,
+) -> tuple[dict, dict]:
+    """
+    Parse job descriptions in batches using async processing.
+    
+    Args:
+        jobs_df: DataFrame containing jobs to parse
+        parsing_task: Rich progress task for tracking
+        progress: Rich progress object
+        batch_size: Number of jobs to process in parallel per batch (default: 4)
+    
+    Returns:
+        Tuple of (parsed_data_map, parse_stats)
+    """
+    parsed_data_map = {}
+    parse_stats = {
+        "success": 0,
+        "failed": 0,
+    }
+    
+    async def process_single_job(idx: int, description: str) -> tuple[int, dict | None]:
+        """Process a single job description asynchronously."""
+        try:
+            if description and isinstance(description, str) and description.strip():
+                result = await extract_job_info(
+                    job_description=description,
+                    temperature=0.1,
+                    max_tokens=500,
+                )
+                # Extract only values from FieldValue objects
+                extracted_data = {}
+                for key, field_value in result.items():
+                    if key != "metadata":
+                        extracted_data[key] = field_value.value if hasattr(field_value, "value") else field_value
+                
+                return idx, extracted_data
+            else:
+                return idx, None
+        except Exception as e:
+            logger.warning(f"Failed to parse job at index {idx}: {e}")
+            return idx, None
+    
+    # Prepare jobs with descriptions
+    jobs_to_parse = []
+    for idx, row in jobs_df.iterrows():
+        description = row.get("description")
+        jobs_to_parse.append((idx, description))
+    
+    # Split into batches
+    batches = [
+        jobs_to_parse[i:i + batch_size]
+        for i in range(0, len(jobs_to_parse), batch_size)
+    ]
+    
+    # Process batches sequentially, jobs within each batch in parallel
+    for batch_idx, batch in enumerate(batches):
+        if len(batches) > 1:
+            logger.debug(f"Processing batch {batch_idx + 1}/{len(batches)} ({len(batch)} job(s))")
+        
+        # Process jobs in current batch concurrently
+        tasks = [
+            process_single_job(idx, description)
+            for idx, description in batch
+        ]
+        batch_results = await asyncio.gather(*tasks)
+        
+        # Process results
+        for idx, result_data in batch_results:
+            if result_data is not None:
+                parsed_data_map[idx] = result_data
+                parse_stats["success"] += 1
+                logger.debug(f"Successfully parsed job at index {idx}")
+            else:
+                parse_stats["failed"] += 1
+                logger.debug(f"No description or failed to parse job at index {idx}")
+            
+            progress.advance(parsing_task, 1)
+    
+    return parsed_data_map, parse_stats
+
+
+def _process_companies_in_batches(
+    session,
+    linkedin_urls: list[str],
+    company_cache: dict[str, int],
+    company_stats: dict[str, int],
+    company_task,
+    progress: Progress,
+    batch_size: int = 10,
+) -> None:
+    """
+    Process company enrichment in batches.
+    
+    Args:
+        session: Database session
+        linkedin_urls: List of LinkedIn URLs to process
+        company_cache: Cache dictionary mapping LinkedIn URLs to company IDs
+        company_stats: Statistics dictionary for tracking
+        company_task: Rich progress task for tracking
+        progress: Rich progress object
+        batch_size: Number of companies to process per batch (default: 10)
+    """
+    # Split into batches
+    batches = [
+        linkedin_urls[i:i + batch_size]
+        for i in range(0, len(linkedin_urls), batch_size)
+    ]
+    
+    # Process batches sequentially
+    for batch_idx, batch in enumerate(batches):
+        if len(batches) > 1:
+            logger.debug(f"Processing company batch {batch_idx + 1}/{len(batches)} ({len(batch)} company(s))")
+        
+        # Process companies in current batch
+        for linkedin_url in batch:
+            company_id = _ensure_company(
+                session,
+                linkedin_url,
+                company_cache,
+                company_stats,
+            )
+            if company_id:
+                company_cache[linkedin_url] = company_id
+            progress.advance(company_task, 1)
 
 
 def _filter_existing_jobs(

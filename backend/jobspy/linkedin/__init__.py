@@ -100,8 +100,8 @@ class LinkedIn(Scraper):
             params = {
                 "keywords": scraper_input.search_term,
                 # "location": scraper_input.location,
-                "distance": scraper_input.distance,
-                "geoId": "91000007",
+                # "distance": scraper_input.distance,
+                "geoId": "103644278",
                 "f_WT": 2 if scraper_input.is_remote else None,
                 "f_JT": (
                     job_type_code(scraper_input.job_type)

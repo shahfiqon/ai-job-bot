@@ -50,5 +50,4 @@ from . import register as _register  # noqa: E402,F401
 from . import scrape as _scrape  # noqa: E402,F401
 
 
-if __name__ == "__main__":
-    app()
+app()

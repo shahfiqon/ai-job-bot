@@ -76,6 +76,15 @@ class Job(Base):
     location_restrictions = Column(JSONB, nullable=True)
     exclusive_location_requirement = Column(Boolean, nullable=True)
     
+    # DSPy-parsed fields from job description
+    is_python_main = Column(Boolean, nullable=True)
+    contract_feasible = Column(Boolean, nullable=True)
+    relocate_required = Column(Boolean, nullable=True)
+    specific_locations = Column(JSONB, nullable=True)
+    accepts_non_us = Column(Boolean, nullable=True)
+    screening_required = Column(Boolean, nullable=True)
+    company_size = Column(String(64), nullable=True)
+    
     created_at = Column(
         DateTime(timezone=True),
         nullable=False,
