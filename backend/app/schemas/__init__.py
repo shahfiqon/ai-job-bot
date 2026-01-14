@@ -20,6 +20,7 @@ from .saved_job import (
     SavedJobResponse,
     SavedJobUpdate,
 )
+from .seen_job import MarkAllAsSeenResponse, SeenJobResponse
 from .tailored_resume import (
     TailoredResumeListItemResponse,
     TailoredResumeListResponse,
@@ -45,6 +46,8 @@ __all__ = [
     "SavedJobListItemResponse",
     "SavedJobResponse",
     "SavedJobUpdate",
+    "SeenJobResponse",
+    "MarkAllAsSeenResponse",
     "TailoredResumeListItemResponse",
     "TailoredResumeListResponse",
     "TailoredResumeResponse",

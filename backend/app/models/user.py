@@ -28,4 +28,5 @@ class User(Base):
     saved_jobs = relationship("SavedJob", back_populates="user", cascade="all, delete-orphan")
     blocked_companies = relationship("BlockedCompany", back_populates="user", cascade="all, delete-orphan")
     tailored_resumes = relationship("TailoredResume", back_populates="user", cascade="all, delete-orphan")
+    seen_jobs = relationship("SeenJob", back_populates="user", cascade="all, delete-orphan")
 

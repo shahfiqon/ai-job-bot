@@ -5,7 +5,8 @@ from app.models.blocked_company import BlockedCompany
 from app.models.company import Company
 from app.models.job import Job
 from app.models.saved_job import SavedJob
+from app.models.seen_job import SeenJob
 from app.models.tailored_resume import TailoredResume
 from app.models.user import User
 
-__all__ = ["Base", "BlockedCompany", "Company", "Job", "SavedJob", "TailoredResume", "User"]
+__all__ = ["Base", "BlockedCompany", "Company", "Job", "SavedJob", "SeenJob", "TailoredResume", "User"]

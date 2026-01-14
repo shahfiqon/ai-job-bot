@@ -11,7 +11,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { blockCompany, fetchJobs, type JobFilters } from "@/lib/api";
+import { blockCompany, fetchJobs, markAllJobsAsSeen, type JobFilters } from "@/lib/api";
 import type { Job } from "@/types/job";
 
 export default function JobsListWithFilters() {
@@ -20,8 +20,8 @@ export default function JobsListWithFilters() {
   const [page, setPage] = useState(1);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [markingAsSeen, setMarkingAsSeen] = useState(false);
   const [filters, setFilters] = useState<JobFilters>({
-    max_employee_size: 111, // Default: exclude companies larger than 111 employees
     relocate_required: false, // Default: exclude jobs that require relocation
   });
 
@@ -54,7 +54,6 @@ export default function JobsListWithFilters() {
 
   const handleClearFilters = () => {
     setFilters({
-      max_employee_size: 111, // Always keep max_employee_size at 111 to exclude large companies
       relocate_required: false, // Always keep relocate_required at false to exclude relocate-required jobs
     });
     setPage(1);
@@ -64,6 +63,28 @@ export default function JobsListWithFilters() {
     // Optimistically remove the job from the list
     setJobs((prevJobs) => prevJobs.filter((job) => job.id !== jobId));
     setTotal((prevTotal) => Math.max(0, prevTotal - 1));
+  };
+
+  const handleMarkAllAsSeen = async () => {
+    setMarkingAsSeen(true);
+    setError(null);
+    try {
+      const result = await markAllJobsAsSeen();
+      // Reload jobs list - it will now be empty since all jobs are marked as seen
+      const data = await fetchJobs(page, 20, filters);
+      setJobs(data.jobs);
+      setTotal(data.total);
+      // Show success message (you could use a toast library here)
+      alert(`Successfully marked ${result.jobs_marked} jobs as seen.`);
+    } catch (err) {
+      setError(
+        err instanceof Error
+          ? err.message
+          : "Failed to mark jobs as seen."
+      );
+    } finally {
+      setMarkingAsSeen(false);
+    }
   };
 
   if (loading && jobs.length === 0) {
@@ -110,6 +131,13 @@ export default function JobsListWithFilters() {
             </>
           )}
         </div>
+        <Button
+          onClick={handleMarkAllAsSeen}
+          disabled={markingAsSeen || loading || total === 0}
+          variant="outline"
+        >
+          {markingAsSeen ? "Marking..." : "Mark all as seen"}
+        </Button>
       </div>
       <JobsTable jobs={jobs} onJobBlocked={handleJobBlocked} />
       {total > 20 && (

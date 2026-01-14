@@ -92,8 +92,6 @@ export interface JobFilters {
   independent_contractor_friendly?: boolean;
   has_own_products?: boolean;
   is_recruiting_company?: boolean;
-  min_employee_size?: number;
-  max_employee_size?: number;
   // Applicants count filters
   min_applicants_count?: number;
   max_applicants_count?: number;
@@ -157,12 +155,6 @@ export async function fetchJobs(
     }
     if (filters.is_recruiting_company !== undefined) {
       searchParams.append("is_recruiting_company", String(filters.is_recruiting_company));
-    }
-    if (filters.min_employee_size !== undefined) {
-      searchParams.append("min_employee_size", String(filters.min_employee_size));
-    }
-    if (filters.max_employee_size !== undefined) {
-      searchParams.append("max_employee_size", String(filters.max_employee_size));
     }
     if (filters.min_applicants_count !== undefined) {
       searchParams.append("min_applicants_count", String(filters.min_applicants_count));
@@ -611,5 +603,27 @@ export async function downloadTailoredResumePDF(jobId: number): Promise<Blob> {
 
   const blob = await response.blob();
   return blob;
+}
+
+/**
+ * Mark all unseen jobs as seen for the current user
+ */
+export async function markAllJobsAsSeen(): Promise<{ message: string; jobs_marked: number }> {
+  const response = await fetch(`${API_BASE_URL}/api/seen-jobs/mark-all-as-seen`, {
+    method: "POST",
+    headers: getAuthHeaders(),
+  });
+
+  if (!response.ok) {
+    const error = await response.json().catch(() => ({ detail: "Failed to mark jobs as seen" }));
+    throw new ApiError(
+      error.detail || "Failed to mark jobs as seen",
+      response.status,
+      response
+    );
+  }
+
+  const data = await response.json();
+  return data;
 }
 

@@ -104,7 +104,7 @@ const JobsTable = ({ jobs, onJobBlocked }: JobsTableProps) => {
                     <Briefcase className="h-4 w-4" />
                     <span>{job.company_name ?? "Confidential company"}</span>
                   </div>
-                  {/* Display job categories and technologies */}
+                  {/* Display job categories, technologies, and required skills */}
                   <div className="flex flex-wrap gap-1 mt-2">
                     {job.job_categories?.slice(0, 3).map((category) => (
                       <Badge key={category} variant="secondary" className="text-xs">
@@ -114,6 +114,11 @@ const JobsTable = ({ jobs, onJobBlocked }: JobsTableProps) => {
                     {job.technologies?.slice(0, 3).map((tech) => (
                       <Badge key={tech} variant="outline" className="text-xs">
                         {tech}
+                      </Badge>
+                    ))}
+                    {job.required_skills?.slice(0, 5).map((skill) => (
+                      <Badge key={skill} variant="default" className="text-xs">
+                        {skill}
                       </Badge>
                     ))}
                   </div>
