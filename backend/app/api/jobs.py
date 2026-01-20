@@ -104,6 +104,22 @@ def list_jobs(
         default=None,
         description="Filter for jobs that require screening",
     ),
+    # Employee count filters
+    min_employees: int | None = Query(
+        default=None,
+        ge=0,
+        description="Minimum number of employees at the company",
+    ),
+    max_employees: int | None = Query(
+        default=None,
+        ge=0,
+        description="Maximum number of employees at the company",
+    ),
+    # Title keyword search
+    title_keyword: str | None = Query(
+        default=None,
+        description="Keyword to search in job title (case-insensitive)",
+    ),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ) -> JobListResponse:
@@ -180,15 +196,20 @@ def list_jobs(
         if screening_required is not None:
             filters.append(Job.screening_required == screening_required)
         
+        # Title keyword search
+        if title_keyword:
+            filters.append(Job.title.ilike(f"%{title_keyword}%"))
+        
         # Company filters - need to join with Company table
-        company_filters_needed = (
+        # Use inner join for boolean company filters, outer join for employee filters
+        company_boolean_filters_needed = (
             has_own_products is not None
             or is_recruiting_company is not None
         )
         
         # Always join Company to get employee size data for display
-        # Use inner join if filtering by company fields, outer join otherwise
-        if company_filters_needed:
+        # Use inner join if filtering by company boolean fields, outer join otherwise
+        if company_boolean_filters_needed:
             query = query.join(Company, Job.company_id == Company.id)
             if has_own_products is not None:
                 filters.append(Company.has_own_products == has_own_products)
@@ -197,6 +218,32 @@ def list_jobs(
         else:
             # Outer join to include company data for display, but don't filter out jobs without companies
             query = query.outerjoin(Company, Job.company_id == Company.id)
+        
+        # Employee count filters - use outer join logic to keep jobs with missing data
+        if min_employees is not None or max_employees is not None:
+            employee_conditions = []
+            
+            if min_employees is not None:
+                # Company size should be >= min threshold OR is None (skip filtering)
+                employee_conditions.append(
+                    or_(
+                        Company.company_size_on_linkedin >= min_employees,
+                        Company.company_size_on_linkedin.is_(None)
+                    )
+                )
+            
+            if max_employees is not None:
+                # Company size should be <= max threshold OR is None (skip filtering)
+                employee_conditions.append(
+                    or_(
+                        Company.company_size_on_linkedin <= max_employees,
+                        Company.company_size_on_linkedin.is_(None)
+                    )
+                )
+            
+            # Apply all employee conditions
+            if employee_conditions:
+                filters.append(and_(*employee_conditions))
         
         # Filter out jobs from blocked companies
         # LEFT JOIN blocked_companies to check if company is blocked by current user

@@ -25,6 +25,9 @@ from app.models.job import Job
 from app.utils.dspy_utils import extract_job_info
 from cli.main import app, console
 from cli.utils import (
+    extract_indeed_companies,
+    filter_existing_indeed_companies,
+    create_indeed_company,
     fetch_company_from_proxycurl,
     map_dataframe_row_to_job,
     map_proxycurl_to_company,
@@ -81,6 +84,15 @@ def scrape(
     jobs_filtered = 0
     original_companies_count = 0
     companies_filtered = 0
+    
+    # Initialize Indeed company stats
+    indeed_companies_stats = {
+        "found": 0,
+        "created": 0,
+        "cached": 0,
+        "failed": 0,
+        "filtered": 0,
+    }
 
     try:
         progress = Progress(
@@ -163,19 +175,84 @@ def scrape(
                 f"[green]Processing {len(jobs_df)} new jobs.[/]"
             )
 
-            # Extract company URLs from filtered (new) jobs only
+            # Process Indeed companies (without Proxycurl enrichment)
+            # Extract Indeed jobs from filtered dataframe
+            indeed_jobs_df = jobs_df[jobs_df.get("site") == "indeed"].copy() if "site" in jobs_df.columns else pd.DataFrame()
+            
+            if not indeed_jobs_df.empty:
+                # Extract unique Indeed companies (URL + name)
+                indeed_company_tuples = extract_indeed_companies(indeed_jobs_df)
+                indeed_companies_stats["found"] = len(indeed_company_tuples)
+                
+                if indeed_company_tuples:
+                    console.print(
+                        f"[bold cyan]Found {len(indeed_company_tuples)} Indeed companies from new jobs.[/]"
+                    )
+                    
+                    # Filter out companies that already exist in DB
+                    indeed_filter_task = progress.add_task(
+                        "[bold]Filtering existing Indeed companies...[/bold]",
+                        total=1,
+                    )
+                    indeed_company_tuples, indeed_filtered = filter_existing_indeed_companies(
+                        session, indeed_company_tuples
+                    )
+                    indeed_companies_stats["filtered"] = indeed_filtered
+                    progress.update(indeed_filter_task, completed=1)
+                    
+                    if indeed_filtered > 0:
+                        console.print(
+                            f"[yellow]Filtered out {indeed_filtered} existing Indeed companies.[/]"
+                        )
+                    
+                    # Create new Indeed companies (without Proxycurl)
+                    if indeed_company_tuples:
+                        console.print(
+                            f"[green]Processing {len(indeed_company_tuples)} new Indeed companies (URL + name only).[/]"
+                        )
+                        
+                        indeed_company_task = progress.add_task(
+                            "[bold]Storing Indeed companies...[/bold]",
+                            total=len(indeed_company_tuples),
+                        )
+                        
+                        for company_url, company_name in indeed_company_tuples:
+                            company_id = create_indeed_company(
+                                session,
+                                company_url,
+                                company_name,
+                                company_cache,
+                                indeed_companies_stats,
+                            )
+                            if company_id:
+                                # Add to cache using URL or name-based key
+                                cache_key = company_url if company_url else f"__name__{company_name}"
+                                company_cache[cache_key] = company_id
+                            progress.advance(indeed_company_task, 1)
+                        
+                        progress.update(indeed_company_task, completed=len(indeed_company_tuples))
+                        session.commit()
+                        
+                        console.print(
+                            f"[green]Stored {indeed_companies_stats['created']} Indeed companies (URL + name only, no enrichment).[/]"
+                        )
+
+            # Extract company URLs from filtered (new) jobs only (LinkedIn only)
             linkedin_urls = _extract_unique_linkedin_urls(jobs_df)
             original_companies_count = len(linkedin_urls)
             console.print(
                 f"[bold cyan]Found {original_companies_count} LinkedIn company URLs from new jobs.[/]"
             )
 
-            if not settings.PROXYCURL_API_KEY:
+            # Check Proxycurl API key for LinkedIn companies (not required for Indeed)
+            has_linkedin_companies = len(linkedin_urls) > 0
+            if has_linkedin_companies and not settings.PROXYCURL_API_KEY:
                 console.print(
-                    "[bold red]Proxycurl API key missing.[/] "
-                    "Set PROXYCURL_API_KEY in your environment or .env file to enable company enrichment."
+                    "[bold yellow]Proxycurl API key missing.[/] "
+                    "LinkedIn companies will not be enriched. "
+                    "Set PROXYCURL_API_KEY in your environment or .env file to enable LinkedIn company enrichment."
                 )
-                raise typer.Exit(code=1)
+                linkedin_urls = []  # Skip LinkedIn enrichment if no API key
 
             # Filter out existing companies from database
             company_filter_task = progress.add_task(
@@ -271,6 +348,11 @@ def scrape(
             company_created=company_stats["created"],
             company_cached=company_stats["cached"],
             company_failed=company_stats["failed"],
+            indeed_companies_found=indeed_companies_stats["found"],
+            indeed_companies_filtered=indeed_companies_stats["filtered"],
+            indeed_companies_created=indeed_companies_stats["created"],
+            indeed_companies_cached=indeed_companies_stats["cached"],
+            indeed_companies_failed=indeed_companies_stats["failed"],
         )
     except typer.Exit:
         raise
@@ -551,6 +633,8 @@ def _persist_job(
         return None
 
     company_id = None
+    
+    # Try to find company by LinkedIn URL first (for LinkedIn jobs)
     linkedin_url = normalize_linkedin_url(row.get("company_url"))
     if linkedin_url:
         company_id = company_cache.get(linkedin_url)
@@ -562,6 +646,45 @@ def _persist_job(
             )
             if company_id:
                 company_cache[linkedin_url] = company_id
+    
+    # For Indeed jobs (and other non-LinkedIn sources), try raw URL or generated URL lookup
+    if company_id is None:
+        import re
+        
+        raw_company_url = row.get("company_url") or row.get("company_url_direct")
+        company_name = row.get("company")
+        
+        # Try cache lookup by URL
+        if raw_company_url:
+            company_id = company_cache.get(raw_company_url)
+        
+        # For Indeed companies without URLs, try the generated pseudo-URL
+        if company_id is None and company_name and not raw_company_url:
+            slug = re.sub(r'[^a-z0-9]+', '-', company_name.lower()).strip('-')
+            generated_url = f"indeed://company/{slug}"
+            company_id = company_cache.get(generated_url)
+        
+        # Try DB lookup if not in cache
+        if company_id is None:
+            if raw_company_url:
+                company_id = (
+                    session.query(Company.id)
+                    .filter(Company.linkedin_url == raw_company_url)
+                    .scalar()
+                )
+                if company_id and raw_company_url:
+                    company_cache[raw_company_url] = company_id
+            elif company_name:
+                # Try generated URL for Indeed companies
+                slug = re.sub(r'[^a-z0-9]+', '-', company_name.lower()).strip('-')
+                generated_url = f"indeed://company/{slug}"
+                company_id = (
+                    session.query(Company.id)
+                    .filter(Company.linkedin_url == generated_url)
+                    .scalar()
+                )
+                if company_id:
+                    company_cache[generated_url] = company_id
 
     try:
         with session.begin_nested():
@@ -590,6 +713,11 @@ def _show_summary(
     company_created: int,
     company_cached: int,
     company_failed: int,
+    indeed_companies_found: int = 0,
+    indeed_companies_filtered: int = 0,
+    indeed_companies_created: int = 0,
+    indeed_companies_cached: int = 0,
+    indeed_companies_failed: int = 0,
 ) -> None:
     table = Table(title="Scrape Summary")
     table.add_column("Metric", justify="left", style="cyan", no_wrap=True)
@@ -599,11 +727,20 @@ def _show_summary(
     table.add_row("Jobs Filtered (existing)", str(jobs_filtered))
     table.add_row("Jobs Created", str(job_created))
     table.add_row("Jobs Skipped (duplicates)", str(job_skipped))
-    table.add_row("Companies Found", str(companies_found))
-    table.add_row("Companies Filtered (existing)", str(companies_filtered))
-    table.add_row("Companies Created", str(company_created))
-    table.add_row("Companies Cached", str(company_cached))
-    table.add_row("Companies Failed", str(company_failed))
+    table.add_row("", "")  # Separator
+    table.add_row("[bold]LinkedIn Companies[/]", "")
+    table.add_row("  Found", str(companies_found))
+    table.add_row("  Filtered (existing)", str(companies_filtered))
+    table.add_row("  Created (enriched)", str(company_created))
+    table.add_row("  Cached", str(company_cached))
+    table.add_row("  Failed", str(company_failed))
+    table.add_row("", "")  # Separator
+    table.add_row("[bold]Indeed Companies[/]", "")
+    table.add_row("  Found", str(indeed_companies_found))
+    table.add_row("  Filtered (existing)", str(indeed_companies_filtered))
+    table.add_row("  Created (URL+name only)", str(indeed_companies_created))
+    table.add_row("  Cached", str(indeed_companies_cached))
+    table.add_row("  Failed", str(indeed_companies_failed))
 
     console.print(table)
     console.print(

@@ -369,3 +369,152 @@ def _split_to_list(value: Any) -> list[str] | None:
         parts = [part.strip() for part in value.split(",") if part.strip()]
         return parts or None
     return None
+
+
+def extract_indeed_companies(df: pd.DataFrame) -> list[tuple[str | None, str]]:
+    """
+    Extract unique Indeed company (URL, name) pairs from jobs dataframe.
+    
+    Args:
+        df: DataFrame containing jobs (should be filtered to Indeed jobs only)
+    
+    Returns:
+        List of (company_url, company_name) tuples where company_name is never None
+    """
+    companies = set()
+    
+    for _, row in df.iterrows():
+        company_name = _safe_str(row.get("company"))
+        if not company_name:
+            continue
+            
+        # Try to get company URL from available columns
+        company_url = None
+        for url_col in ["company_url", "company_url_direct"]:
+            if url_col in row.index:
+                url = _safe_str(row.get(url_col))
+                if url:
+                    company_url = url
+                    break
+        
+        # Store as tuple (url can be None, but name must exist)
+        companies.add((company_url, company_name))
+    
+    return sorted(companies, key=lambda x: (x[1], x[0] or ""))
+
+
+def filter_existing_indeed_companies(
+    session,
+    company_tuples: list[tuple[str | None, str]],
+) -> tuple[list[tuple[str | None, str]], int]:
+    """
+    Filter out Indeed companies that already exist in the database.
+    
+    Note: For companies without URLs, we generate a unique pseudo-URL based on the name,
+    so all filtering is done by URL (via the linkedin_url field).
+    
+    Args:
+        session: Database session
+        company_tuples: List of (url, name) tuples
+    
+    Returns:
+        Tuple of (filtered list of new companies, count of filtered companies)
+    """
+    if not company_tuples:
+        return [], 0
+    
+    from app.models.company import Company
+    import re
+    
+    # Generate URLs for companies that don't have one (consistent with create_indeed_company)
+    normalized_tuples = []
+    for url, name in company_tuples:
+        if not url:
+            slug = re.sub(r'[^a-z0-9]+', '-', name.lower()).strip('-')
+            url = f"indeed://company/{slug}"
+        normalized_tuples.append((url, name))
+    
+    # Check which URLs already exist in the database
+    urls = [url for url, _ in normalized_tuples]
+    existing_urls = {
+        url for url, in session.query(Company.linkedin_url)
+        .filter(Company.linkedin_url.in_(urls))
+        .all()
+    }
+    
+    # Filter out existing companies
+    new_companies = [
+        (url, name) for url, name in company_tuples
+        if (url if url else f"indeed://company/{re.sub(r'[^a-z0-9]+', '-', name.lower()).strip('-')}") not in existing_urls
+    ]
+    
+    filtered_count = len(company_tuples) - len(new_companies)
+    return new_companies, filtered_count
+
+
+def create_indeed_company(
+    session,
+    company_url: str | None,
+    company_name: str,
+    company_cache: dict[str, int],
+    company_stats: dict[str, int],
+) -> int | None:
+    """
+    Create a minimal Company record for an Indeed company without Proxycurl enrichment.
+    
+    Args:
+        session: Database session
+        company_url: Company URL (can be None)
+        company_name: Company name (required)
+        company_cache: Cache dict to update with new company ID
+        company_stats: Stats dict to update
+    
+    Returns:
+        Company ID if created successfully, None otherwise
+    """
+    from app.models.company import Company
+    from sqlalchemy.exc import SQLAlchemyError
+    import re
+    
+    # Generate a unique URL for companies without one (linkedin_url is non-nullable)
+    if not company_url:
+        # Create a URL slug from company name
+        slug = re.sub(r'[^a-z0-9]+', '-', company_name.lower()).strip('-')
+        company_url = f"indeed://company/{slug}"
+    
+    # Use URL as cache key
+    cache_key = company_url
+    
+    # Check cache first
+    if cache_key in company_cache:
+        company_stats["cached"] += 1
+        return company_cache[cache_key]
+    
+    # Safety check: verify company doesn't exist in DB
+    existing = session.query(Company).filter(Company.linkedin_url == company_url).first()
+    
+    if existing:
+        company_stats["cached"] += 1
+        company_cache[cache_key] = existing.id
+        return existing.id
+    
+    # Create new minimal company record (no Proxycurl call)
+    try:
+        with session.begin_nested():
+            company = Company(
+                linkedin_url=company_url,  # Reusing this field for generic URLs (including generated ones)
+                name=company_name,
+                # All other fields remain NULL
+            )
+            session.add(company)
+            session.flush()
+        
+        company_stats["created"] += 1
+        company_cache[cache_key] = company.id
+        logger.debug(f"Created Indeed company: {company_name} (URL: {company_url})")
+        return company.id
+        
+    except SQLAlchemyError as exc:
+        company_stats["failed"] += 1
+        logger.exception(f"Failed to persist Indeed company {company_name} (URL: {company_url})")
+        return None

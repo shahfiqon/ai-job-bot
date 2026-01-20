@@ -108,6 +108,7 @@ class LinkedIn(Scraper):
                     if scraper_input.job_type
                     else None
                 ),
+                "sortBy": "R",
                 "pageNum": 0,
                 "start": start,
                 "f_AL": "true" if scraper_input.easy_apply else None,

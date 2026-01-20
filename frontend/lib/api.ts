@@ -104,6 +104,11 @@ export interface JobFilters {
   relocate_required?: boolean;
   accepts_non_us?: boolean;
   screening_required?: boolean;
+  // Employee count filters
+  min_employees?: number;
+  max_employees?: number;
+  // Title keyword search
+  title_keyword?: string;
 }
 
 /**
@@ -183,6 +188,17 @@ export async function fetchJobs(
     }
     if (filters.screening_required !== undefined) {
       searchParams.append("screening_required", String(filters.screening_required));
+    }
+    // Employee count filters
+    if (filters.min_employees !== undefined) {
+      searchParams.append("min_employees", String(filters.min_employees));
+    }
+    if (filters.max_employees !== undefined) {
+      searchParams.append("max_employees", String(filters.max_employees));
+    }
+    // Title keyword search
+    if (filters.title_keyword) {
+      searchParams.append("title_keyword", filters.title_keyword);
     }
   }
 

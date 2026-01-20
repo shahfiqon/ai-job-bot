@@ -44,6 +44,7 @@ export default function JobFiltersComponent({
 }: JobFiltersComponentProps) {
   const [technologyInput, setTechnologyInput] = useState("");
   const [skillInput, setSkillInput] = useState("");
+  const [titleKeywordInput, setTitleKeywordInput] = useState(filters.title_keyword || "");
   
   // Calculate active filter count
   const activeFilterCount = [
@@ -65,6 +66,9 @@ export default function JobFiltersComponent({
     filters.relocate_required !== undefined && filters.relocate_required !== false ? 1 : 0,
     filters.accepts_non_us !== undefined ? 1 : 0,
     filters.screening_required !== undefined ? 1 : 0,
+    filters.min_employees !== undefined ? 1 : 0,
+    filters.max_employees !== undefined ? 1 : 0,
+    filters.title_keyword ? 1 : 0,
   ].reduce((sum: number, count: number) => sum + count, 0);
   
   // Auto-expand when filters are active, or keep expanded state when user is interacting
@@ -76,6 +80,11 @@ export default function JobFiltersComponent({
       setIsExpanded(true);
     }
   }, [activeFilterCount]);
+
+  // Sync local title keyword input with filter value
+  useEffect(() => {
+    setTitleKeywordInput(filters.title_keyword || "");
+  }, [filters.title_keyword]);
 
   const handleCategoryToggle = (category: string) => {
     const current = filters.job_categories || [];
@@ -153,6 +162,52 @@ export default function JobFiltersComponent({
 
       {isExpanded && (
         <div className="space-y-6">
+          {/* Title Keyword Search */}
+          <div>
+            <Label className="text-sm font-medium mb-2 block">
+              Search Job Titles
+            </Label>
+            <div className="flex items-center gap-2">
+              <Input
+                type="text"
+                placeholder="Search job titles (e.g., 'Senior Engineer')"
+                value={titleKeywordInput}
+                onChange={(e) => setTitleKeywordInput(e.target.value)}
+                onBlur={() => {
+                  onFiltersChange({
+                    ...filters,
+                    title_keyword: titleKeywordInput.trim() || undefined,
+                  });
+                }}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") {
+                    e.preventDefault();
+                    onFiltersChange({
+                      ...filters,
+                      title_keyword: titleKeywordInput.trim() || undefined,
+                    });
+                  }
+                }}
+                className="flex-1"
+              />
+              {filters.title_keyword && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => {
+                    setTitleKeywordInput("");
+                    onFiltersChange({
+                      ...filters,
+                      title_keyword: undefined,
+                    });
+                  }}
+                >
+                  <X className="h-4 w-4" />
+                </Button>
+              )}
+            </div>
+          </div>
+
           {/* Job Categories */}
           <div>
             <Label className="text-sm font-medium mb-2 block">
@@ -390,6 +445,93 @@ export default function JobFiltersComponent({
                         onFiltersChange({
                           ...filters,
                           max_applicants_count: undefined,
+                        })
+                      }
+                    >
+                      <X className="h-4 w-4" />
+                    </Button>
+                  )}
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Company Employee Count */}
+          <div>
+            <Label className="text-sm font-medium mb-2 block">
+              Company Size (Employees)
+            </Label>
+            <div className="space-y-3">
+              <div>
+                <Label className="text-xs text-muted-foreground mb-1 block">
+                  Minimum:{" "}
+                  {filters.min_employees !== undefined
+                    ? filters.min_employees.toLocaleString()
+                    : "Any"}
+                </Label>
+                <div className="flex items-center gap-4">
+                  <Slider
+                    value={[filters.min_employees || 0]}
+                    onValueChange={([value]: number[]) => {
+                      setIsExpanded(true);
+                      onFiltersChange({
+                        ...filters,
+                        min_employees: value === 0 ? undefined : value,
+                      });
+                    }}
+                    min={0}
+                    max={10000}
+                    step={100}
+                    className="flex-1"
+                  />
+                  {filters.min_employees !== undefined && (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() =>
+                        onFiltersChange({
+                          ...filters,
+                          min_employees: undefined,
+                        })
+                      }
+                    >
+                      <X className="h-4 w-4" />
+                    </Button>
+                  )}
+                </div>
+              </div>
+              <div>
+                <Label className="text-xs text-muted-foreground mb-1 block">
+                  Maximum:{" "}
+                  {filters.max_employees !== undefined
+                    ? filters.max_employees === 10000
+                      ? "10,000+"
+                      : filters.max_employees.toLocaleString()
+                    : "Any"}
+                </Label>
+                <div className="flex items-center gap-4">
+                  <Slider
+                    value={[filters.max_employees || 10000]}
+                    onValueChange={([value]: number[]) => {
+                      setIsExpanded(true);
+                      onFiltersChange({
+                        ...filters,
+                        max_employees: value === 10000 ? undefined : value,
+                      });
+                    }}
+                    min={0}
+                    max={10000}
+                    step={100}
+                    className="flex-1"
+                  />
+                  {filters.max_employees !== undefined && (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() =>
+                        onFiltersChange({
+                          ...filters,
+                          max_employees: undefined,
                         })
                       }
                     >
